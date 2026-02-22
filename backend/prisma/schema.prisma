@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+}
+
+enum GeofenceType {
+  OFFICE
+  CLIENT
+  WAREHOUSE
+  CUSTOM
+}
+
+enum AlertType {
+  MOCK_LOCATION
+  IMPOSSIBLE_TRAVEL
+  SPOOFING_APP
+  GNSS_ANOMALY
+  INTEGRITY_FAILURE
+  SENSOR_MISMATCH
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  EMPLOYEE_CREATED
+  EMPLOYEE_UPDATED
+  EMPLOYEE_DELETED
+  ATTENDANCE_EDITED
+  GEOFENCE_CREATED
+  GEOFENCE_UPDATED
+  GEOFENCE_DELETED
+  DEVICE_RESET
+  SETTINGS_CHANGED
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model Employee {
+  id                 String    @id @default(uuid())
+  employeeCode       String    @unique @map("employee_code")
+  name               String
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  phone              String?
+  department         String?
+  designation        String?
+  role               Role      @default(EMPLOYEE)
+  isActive           Boolean   @default(true) @map("is_active")
+
+  // Device binding
+  registeredDeviceId String?   @map("registered_device_id")
+  deviceBoundAt      DateTime? @map("device_bound_at")
+  deviceModel        String?   @map("device_model")
+
+  // Refresh token (hashed)
+  refreshTokenHash   String?   @map("refresh_token_hash")
+
+  // Soft delete
+  deletedAt          DateTime? @map("deleted_at")
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  attendance      Attendance[]
+  locationRecords LocationRecord[]
+  spoofingAlerts  SpoofingAlert[]
+  employeeGeofences EmployeeGeofence[]
+
+  @@map("employees")
+}
+
+model Attendance {
+  id                 String           @id @default(uuid())
+  employeeId         String           @map("employee_id")
+  date               DateTime         @db.Date
+  timeIn             DateTime?        @map("time_in")
+  timeOut            DateTime?        @map("time_out")
+  timeInLatitude     Decimal?         @map("time_in_latitude") @db.Decimal(10, 7)
+  timeInLongitude    Decimal?         @map("time_in_longitude") @db.Decimal(10, 7)
+  timeOutLatitude    Decimal?         @map("time_out_latitude") @db.Decimal(10, 7)
+  timeOutLongitude   Decimal?         @map("time_out_longitude") @db.Decimal(10, 7)
+  status             AttendanceStatus @default(PRESENT)
+  notes              String?
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+  @@map("attendance")
+}
+
+model LocationRecord {
+  id              String    @id @default(uuid())
+  employeeId      String    @map("employee_id")
+  latitude        Decimal   @db.Decimal(10, 7)
+  longitude       Decimal   @db.Decimal(10, 7)
+  accuracy        Float?
+  altitude        Float?
+  speed           Float?
+  bearing         Float?
+  provider        String?
+  isMock          Boolean   @default(false) @map("is_mock")
+  batteryLevel    Int?      @map("battery_level")
+  deviceId        String?   @map("device_id")
+
+  // Anti-spoofing raw metadata (server computes risk, not trust client)
+  satelliteCount  Int?      @map("satellite_count")
+  snrAverage      Float?    @map("snr_average")
+  accelerometerX  Float?    @map("accelerometer_x")
+  accelerometerY  Float?    @map("accelerometer_y")
+  accelerometerZ  Float?    @map("accelerometer_z")
+
+  // Risk scoring (server-computed)
+  riskScore       Int       @default(0) @map("risk_score")
+
+  recordedAt      DateTime  @map("recorded_at")
+  syncedAt        DateTime? @map("synced_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  employee       Employee        @relation(fields: [employeeId], references: [id])
+  spoofingAlerts SpoofingAlert[]
+
+  @@index([employeeId, recordedAt])
+  @@index([recordedAt])
+  @@map("location_records")
+}
+
+model Geofence {
+  id           String       @id @default(uuid())
+  name         String
+  latitude     Decimal      @db.Decimal(10, 7)
+  longitude    Decimal      @db.Decimal(10, 7)
+  radiusMeters Int          @default(100) @map("radius_meters")
+  type         GeofenceType @default(OFFICE)
+  isActive     Boolean      @default(true) @map("is_active")
+  deletedAt    DateTime?    @map("deleted_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  employeeGeofences EmployeeGeofence[]
+
+  @@map("geofences")
+}
+
+model EmployeeGeofence {
+  employeeId String   @map("employee_id")
+  geofenceId String   @map("geofence_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  geofence Geofence @relation(fields: [geofenceId], references: [id])
+
+  @@id([employeeId, geofenceId])
+  @@map("employee_geofences")
+}
+
+model SpoofingAlert {
+  id               String        @id @default(uuid())
+  employeeId       String        @map("employee_id")
+  alertType        AlertType     @map("alert_type")
+  details          Json?
+  locationRecordId String?       @map("location_record_id")
+  severity         AlertSeverity @default(MEDIUM)
+  riskScore        Int           @default(0) @map("risk_score")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  employee       Employee        @relation(fields: [employeeId], references: [id])
+  locationRecord LocationRecord? @relation(fields: [locationRecordId], references: [id])
+
+  @@index([employeeId, createdAt])
+  @@map("spoofing_alerts")
+}
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  userId      String?     @map("user_id")
+  action      AuditAction
+  targetType  String?     @map("target_type")
+  targetId    String?     @map("target_id")
+  details     Json?
+  ipAddress   String?     @map("ip_address")
+  userAgent   String?     @map("user_agent")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model DailyRouteSummary {
+  id              String   @id @default(uuid())
+  employeeId      String   @map("employee_id")
+  date            DateTime @db.Date
+  totalDistanceKm Decimal  @map("total_distance_km") @db.Decimal(10, 3)
+  activeMinutes   Int      @map("active_minutes")
+  stopsCount      Int      @default(0) @map("stops_count")
+  firstLatitude   Decimal? @map("first_latitude") @db.Decimal(10, 7)
+  firstLongitude  Decimal? @map("first_longitude") @db.Decimal(10, 7)
+  lastLatitude    Decimal? @map("last_latitude") @db.Decimal(10, 7)
+  lastLongitude   Decimal? @map("last_longitude") @db.Decimal(10, 7)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+  @@map("daily_route_summaries")
+}

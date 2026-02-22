@@ -32,3 +32,31 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Node.js
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Next.js
+.next/
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
