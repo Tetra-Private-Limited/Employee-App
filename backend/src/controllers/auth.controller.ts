@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma.js';
 import * as authService from '../services/auth.service.js';
 import * as auditService from '../services/audit.service.js';
@@ -128,7 +129,11 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
 
     return success(res, { accessToken: newAccessToken, refreshToken: newRefreshToken });
   } catch (err) {
-    return error(res, 'Invalid or expired refresh token', 401);
+    if (err instanceof jwt.JsonWebTokenError || err instanceof jwt.TokenExpiredError) {
+      return error(res, 'Invalid or expired refresh token', 401);
+    }
+
+    return next(err);
   }
 }
 
@@ -227,6 +232,11 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
 export async function resetDevice(req: Request, res: Response, next: NextFunction) {
   try {
     const { employeeId } = req.body;
+
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
+    if (!employee || employee.deletedAt) {
+      return error(res, 'User not found', 404);
+    }
 
     await prisma.employee.update({
       where: { id: employeeId },
