@@ -8,6 +8,19 @@ export interface AuthUser {
   role: string;
 }
 
+function isAuthUserPayload(payload: unknown): payload is AuthUser {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.email === 'string' &&
+    typeof candidate.role === 'string'
+  );
+}
+
 declare global {
   namespace Express {
     interface Request {
@@ -29,7 +42,15 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, config.jwt.accessSecret) as AuthUser;
+    const decoded = jwt.verify(token, config.jwt.accessSecret);
+
+    if (!isAuthUserPayload(decoded)) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid access token',
+      });
+    }
+
     req.user = decoded;
     next();
   } catch (err) {
