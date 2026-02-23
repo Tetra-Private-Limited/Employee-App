@@ -73,6 +73,20 @@ describe('authenticate middleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+
+  it('returns 401 when token payload is missing required claims', () => {
+    const token = jwt.sign({ id: 'u1' }, config.jwt.accessSecret, { expiresIn: '1h' });
+    const { req, res, next } = mockReqRes({ authorization: `Bearer ${token}` });
+
+    authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'Invalid access token' })
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('returns 401 for token signed with wrong secret', () => {
     const token = jwt.sign({ id: 'u1' }, 'wrong-secret');
     const { req, res, next } = mockReqRes({ authorization: `Bearer ${token}` });
