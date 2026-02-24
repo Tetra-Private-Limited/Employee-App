@@ -21,6 +21,7 @@ import com.employee.tracker.service.LocationTrackingService
 import com.employee.tracker.ui.attendance.AttendanceHistoryActivity
 import com.employee.tracker.ui.login.LoginActivity
 import com.employee.tracker.ui.profile.ProfileActivity
+import com.employee.tracker.data.tracking.TrackingHealthStats
 import com.employee.tracker.util.Result
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.AndroidEntryPoint
@@ -70,12 +71,14 @@ class DashboardActivity : AppCompatActivity() {
         viewModel.loadProfile()
         viewModel.loadTodayAttendance()
         viewModel.loadPendingCount()
+        viewModel.refreshTrackingHealth()
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.loadTodayAttendance()
         viewModel.loadPendingCount()
+        viewModel.refreshTrackingHealth()
     }
 
     private fun setupUI() {
@@ -147,6 +150,10 @@ class DashboardActivity : AppCompatActivity() {
             binding.tvPendingLocations.text = "Pending sync: $count locations"
             binding.btnSyncLocations.visibility = if (count > 0) View.VISIBLE else View.GONE
         }
+
+        viewModel.trackingHealth.observe(this) { stats ->
+            updateTrackingHealthUI(stats)
+        }
     }
 
     private fun updateProfileUI(profile: EmployeeInfo) {
@@ -195,6 +202,27 @@ class DashboardActivity : AppCompatActivity() {
             binding.btnClockIn.visibility = View.GONE
             binding.btnClockOut.visibility = View.VISIBLE
         }
+    }
+
+
+    private fun updateTrackingHealthUI(stats: TrackingHealthStats) {
+        binding.tvLastLocationTimestamp.text = formatTimestamp(stats.lastLocationTimestamp)
+        binding.tvLastSyncTimestamp.text = formatTimestamp(stats.lastSuccessfulSyncTimestamp)
+        binding.tvTrackingPendingCount.text = stats.pendingLocationCount.toString()
+        binding.tvGpsAccuracyBucket.text = stats.gpsAccuracyBucket
+        binding.tvMockWarning.text = if (stats.mockLocationWarning) "Mock location detected" else "No mock location detected"
+        binding.tvMockWarning.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (stats.mockLocationWarning) android.R.color.holo_red_dark else android.R.color.darker_gray
+            )
+        )
+    }
+
+    private fun formatTimestamp(timestamp: Long?): String {
+        if (timestamp == null) return "--"
+        val formatter = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault())
+        return formatter.format(Date(timestamp))
     }
 
     private fun performClockAction(isClockIn: Boolean) {
