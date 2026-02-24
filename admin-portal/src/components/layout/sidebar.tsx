@@ -14,7 +14,7 @@ const navItems = [
   { href: '/reports', label: 'Reports', icon: ChartIcon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -41,6 +41,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn('sidebar-link', isActive && 'active')}
             >
               <item.icon className="w-5 h-5 flex-shrink-0" />
