@@ -39,7 +39,7 @@ router.delete('/employees/:id', authenticate, authorize('ADMIN'), employeeCtrl.s
 router.post('/attendance/time-in', authenticate, validate(timeInSchema), attendanceCtrl.timeIn);
 router.post('/attendance/time-out', authenticate, validate(timeOutSchema), attendanceCtrl.timeOut);
 router.get('/attendance/today', authenticate, attendanceCtrl.getToday);
-router.get('/attendance', authenticate, attendanceCtrl.listAttendance);
+router.get('/attendance', authenticate, validateQuery(attendanceQuerySchema), attendanceCtrl.listAttendance);
 
 // ─── Location Routes ─────────────────────────────────────
 router.post('/locations/batch', authenticate, validate(locationBatchSchema), locationCtrl.batchUpload);

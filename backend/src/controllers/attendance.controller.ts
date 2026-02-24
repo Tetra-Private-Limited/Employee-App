@@ -123,15 +123,38 @@ export async function listAttendance(req: Request, res: Response, next: NextFunc
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
+    const role = req.user?.role;
 
     // Role-based visibility
-    if (req.user?.role === 'MANAGER') {
-      const manager = await prisma.employee.findUnique({ where: { id: req.user.id } });
+    if (role === 'MANAGER') {
+      const manager = await prisma.employee.findUnique({ where: { id: req.user!.id } });
       if (manager?.department) {
         where.employee = { department: manager.department, deletedAt: null };
       }
-    } else if (req.user?.role === 'EMPLOYEE') {
-      where.employeeId = req.user.id;
+    } else if (role === 'EMPLOYEE') {
+      where.employeeId = req.user!.id;
+    }
+
+    // Department filter (ADMIN/MANAGER only). Managers cannot override their own department scope.
+    if (department && (role === 'ADMIN' || role === 'MANAGER')) {
+      if (role === 'MANAGER') {
+        const managerDepartment = where.employee?.department;
+
+        // Intersect with manager scope to prevent department privilege escalation.
+        if (!managerDepartment || department !== managerDepartment) {
+          where.employee = {
+            ...(where.employee || {}),
+            department: '__NO_ACCESS_DEPARTMENT__',
+            deletedAt: null,
+          };
+        }
+      } else {
+        where.employee = {
+          ...(where.employee || {}),
+          department,
+          deletedAt: null,
+        };
+      }
     }
 
     if (employeeId) where.employeeId = employeeId;
