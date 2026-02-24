@@ -34,6 +34,8 @@ class TokenManager @Inject constructor(
 
     fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
+    fun hasRefreshToken(): Boolean = !getRefreshToken().isNullOrBlank()
+
     fun isLoggedIn(): Boolean = getAccessToken() != null
 
     fun clearTokens() {
