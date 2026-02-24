@@ -28,7 +28,15 @@ import com.employee.tracker.util.Result
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.util.Locale
+import java.util.TimeZone
 
 @AndroidEntryPoint
 class DashboardActivity : AppCompatActivity() {
@@ -36,6 +44,13 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDashboardBinding
     private val viewModel: DashboardViewModel by viewModels()
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val localZone: ZoneId = ZoneId.systemDefault()
+    private val localTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+    private val legacyTimestampPatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "yyyy-MM-dd HH:mm:ss"
+    )
 
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -205,8 +220,6 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun updateAttendanceUI(attendance: AttendanceRecord?) {
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-
         if (attendance == null) {
             binding.tvClockInTime.text = "Not clocked in"
             binding.tvClockOutTime.text = "--"
@@ -219,23 +232,17 @@ class DashboardActivity : AppCompatActivity() {
         binding.tvAttendanceStatus.text = attendance.status
 
         if (attendance.timeIn != null) {
-            try {
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                val date = parser.parse(attendance.timeIn)
-                binding.tvClockInTime.text = "In: ${date?.let { timeFormat.format(it) } ?: attendance.timeIn}"
-            } catch (e: Exception) {
-                binding.tvClockInTime.text = "In: ${attendance.timeIn}"
-            }
+            val inText = parseApiTimestamp(attendance.timeIn)
+                ?.format(localTimeFormatter)
+                ?: attendance.timeIn
+            binding.tvClockInTime.text = "In: $inText"
         }
 
         if (attendance.timeOut != null) {
-            try {
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                val date = parser.parse(attendance.timeOut)
-                binding.tvClockOutTime.text = "Out: ${date?.let { timeFormat.format(it) } ?: attendance.timeOut}"
-            } catch (e: Exception) {
-                binding.tvClockOutTime.text = "Out: ${attendance.timeOut}"
-            }
+            val outText = parseApiTimestamp(attendance.timeOut)
+                ?.format(localTimeFormatter)
+                ?: attendance.timeOut
+            binding.tvClockOutTime.text = "Out: $outText"
             binding.btnClockIn.visibility = View.GONE
             binding.btnClockOut.visibility = View.GONE
         } else {
@@ -243,6 +250,41 @@ class DashboardActivity : AppCompatActivity() {
             binding.btnClockIn.visibility = View.GONE
             binding.btnClockOut.visibility = View.VISIBLE
         }
+    }
+
+    private fun parseApiTimestamp(rawValue: String): ZonedDateTime? {
+        val value = rawValue.trim()
+
+        try {
+            return Instant.parse(value).atZone(localZone)
+        } catch (_: DateTimeParseException) {
+        }
+
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(localZone)
+        } catch (_: DateTimeParseException) {
+        }
+
+        legacyTimestampPatterns.forEach { pattern ->
+            try {
+                return LocalDateTime.parse(value, DateTimeFormatter.ofPattern(pattern, Locale.US)).atZone(localZone)
+            } catch (_: DateTimeParseException) {
+            }
+
+            try {
+                val parser = SimpleDateFormat(pattern, Locale.US).apply {
+                    timeZone = TimeZone.getDefault()
+                    isLenient = false
+                }
+                val date = parser.parse(value)
+                if (date != null) {
+                    return date.toInstant().atZone(localZone)
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        return null
     }
 
     private fun performClockAction(isClockIn: Boolean) {
