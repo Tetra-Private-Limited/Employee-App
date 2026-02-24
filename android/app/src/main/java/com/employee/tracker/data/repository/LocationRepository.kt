@@ -9,6 +9,7 @@ import com.employee.tracker.security.DeviceInfo
 import com.employee.tracker.util.Result
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.json.JSONObject
 
 @Singleton
 class LocationRepository @Inject constructor(
@@ -55,14 +56,30 @@ class LocationRepository @Inject constructor(
                     integrityToken = null
                 )
             )
-            if (response.isSuccessful) {
+
+            val body = response.body()
+            if (response.isSuccessful && body?.success == true) {
                 locationDao.deleteByIds(pending.map { it.id })
                 Result.Success(pending.size)
             } else {
-                Result.Error("Sync failed: ${response.code()}")
+                val backendMessage = body?.message ?: extractBackendError(response.errorBody()?.string())
+                val diagnostic = backendMessage ?: "Sync failed with HTTP ${response.code()}"
+                Result.Error(diagnostic)
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Sync failed")
+        }
+    }
+
+    private fun extractBackendError(rawErrorBody: String?): String? {
+        if (rawErrorBody.isNullOrBlank()) return null
+
+        return try {
+            val json = JSONObject(rawErrorBody)
+            json.optString("message").takeIf { it.isNotBlank() }
+                ?: json.optString("error").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
         }
     }
 }

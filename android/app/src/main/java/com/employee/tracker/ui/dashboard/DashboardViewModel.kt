@@ -44,6 +44,8 @@ class DashboardViewModel @Inject constructor(
 
     private val _clockActionGate = MutableLiveData<Result<ClockActionGate>>()
     val clockActionGate: LiveData<Result<ClockActionGate>> = _clockActionGate
+    private val _pendingAttendanceActions = MutableLiveData<Int>()
+    val pendingAttendanceActions: LiveData<Int> = _pendingAttendanceActions
 
     fun loadProfile() {
         viewModelScope.launch {
@@ -64,6 +66,7 @@ class DashboardViewModel @Inject constructor(
             _clockAction.value = Result.Loading
             _clockAction.value = attendanceRepository.timeIn(latitude, longitude)
             loadTodayAttendance()
+            loadPendingAttendanceActionCount()
         }
     }
 
@@ -72,6 +75,7 @@ class DashboardViewModel @Inject constructor(
             _clockAction.value = Result.Loading
             _clockAction.value = attendanceRepository.timeOut(latitude, longitude)
             loadTodayAttendance()
+            loadPendingAttendanceActionCount()
         }
     }
 
@@ -108,6 +112,12 @@ class DashboardViewModel @Inject constructor(
     fun loadPendingCount() {
         viewModelScope.launch {
             _pendingLocations.value = locationRepository.getPendingCount()
+        }
+    }
+
+    fun loadPendingAttendanceActionCount() {
+        viewModelScope.launch {
+            _pendingAttendanceActions.value = attendanceRepository.getPendingAttendanceActionCount()
         }
     }
 
