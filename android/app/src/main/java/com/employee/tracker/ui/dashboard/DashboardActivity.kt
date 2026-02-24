@@ -16,6 +16,8 @@ import androidx.core.content.ContextCompat
 import com.employee.tracker.databinding.ActivityDashboardBinding
 import com.employee.tracker.network.model.AttendanceRecord
 import com.employee.tracker.network.model.EmployeeInfo
+import com.employee.tracker.data.repository.AttendanceRepository
+import com.employee.tracker.service.AttendanceReplayWorker
 import com.employee.tracker.service.LocationSyncWorker
 import com.employee.tracker.service.LocationTrackingService
 import com.employee.tracker.ui.attendance.AttendanceHistoryActivity
@@ -70,12 +72,17 @@ class DashboardActivity : AppCompatActivity() {
         viewModel.loadProfile()
         viewModel.loadTodayAttendance()
         viewModel.loadPendingCount()
+        viewModel.loadPendingAttendanceActionCount()
+        AttendanceReplayWorker.enqueuePeriodic(this)
+        AttendanceReplayWorker.enqueueImmediate(this)
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.loadTodayAttendance()
         viewModel.loadPendingCount()
+        viewModel.loadPendingAttendanceActionCount()
+        AttendanceReplayWorker.enqueueImmediate(this)
     }
 
     private fun setupUI() {
@@ -134,11 +141,17 @@ class DashboardActivity : AppCompatActivity() {
                     binding.btnClockIn.isEnabled = true
                     binding.btnClockOut.isEnabled = true
                     Toast.makeText(this, "Success", Toast.LENGTH_SHORT).show()
+                    AttendanceReplayWorker.enqueueImmediate(this)
+                    viewModel.loadPendingAttendanceActionCount()
                 }
                 is Result.Error -> {
                     binding.btnClockIn.isEnabled = true
                     binding.btnClockOut.isEnabled = true
                     Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                    if (result.message == AttendanceRepository.PENDING_ATTENDANCE_ACTION_MESSAGE) {
+                        AttendanceReplayWorker.enqueueImmediate(this)
+                    }
+                    viewModel.loadPendingAttendanceActionCount()
                 }
             }
         }
@@ -146,6 +159,10 @@ class DashboardActivity : AppCompatActivity() {
         viewModel.pendingLocations.observe(this) { count ->
             binding.tvPendingLocations.text = "Pending sync: $count locations"
             binding.btnSyncLocations.visibility = if (count > 0) View.VISIBLE else View.GONE
+        }
+
+        viewModel.pendingAttendanceActions.observe(this) { count ->
+            binding.tvPendingAttendanceActions.text = "Pending attendance action: $count"
         }
     }
 
