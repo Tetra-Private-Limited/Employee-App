@@ -100,6 +100,17 @@ Employee tracking system with a backend API, admin portal, and Android mobile ap
 2. Configure the backend API URL in the network module (`android/app/src/main/java/com/employee/tracker/di/NetworkModule.kt`).
 3. Build and run on a device or emulator.
 
+
+## API Contract Notes (Backend + Mobile)
+
+To keep Android and backend behavior aligned, the mobile app uses a dedicated endpoint for assigned geofences:
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /geofences/my` | Any authenticated user | Returns active, non-deleted geofences assigned to the current user. |
+
+This endpoint is consumed by Android `ApiService.getMyGeofences()` (`android/app/src/main/java/com/employee/tracker/network/ApiService.kt`).
+
 ## Available Scripts
 
 ### Backend (`backend/`)

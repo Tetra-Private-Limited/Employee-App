@@ -48,4 +48,10 @@ interface ApiService {
 
     @GET("geofences/my")
     suspend fun getMyGeofences(): Response<ApiResponse<List<GeofenceInfo>>>
+
+    @GET("geofences/check")
+    suspend fun checkMyGeofences(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double
+    ): Response<ApiResponse<GeofenceCheckResult>>
 }

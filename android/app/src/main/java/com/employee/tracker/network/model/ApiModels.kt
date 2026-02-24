@@ -146,3 +146,21 @@ data class GeofenceInfo(
     val type: String,
     val isActive: Boolean
 )
+
+data class GeofenceCheckResult(
+    val policy: String,
+    val hasAssignedGeofences: Boolean,
+    val insideAnyGeofence: Boolean,
+    val geofences: List<GeofenceCheckItem>
+)
+
+data class GeofenceCheckItem(
+    val id: String,
+    val name: String,
+    val type: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    val distanceMeters: Int,
+    val inside: Boolean
+)
