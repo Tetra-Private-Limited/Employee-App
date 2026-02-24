@@ -9,7 +9,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -40,7 +39,9 @@ class DashboardActivity : AppCompatActivity() {
         val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         if (fineGranted) {
             startTracking()
-            requestBackgroundLocationIfNeeded()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                requestBackgroundLocationIfNeeded()
+            }
         } else {
             Toast.makeText(this, "Location permission is required", Toast.LENGTH_LONG).show()
         }
@@ -238,13 +239,29 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     private fun requestBackgroundLocationIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            showBackgroundLocationRationale()
         }
+    }
+
+    private fun showBackgroundLocationRationale() {
+        AlertDialog.Builder(this)
+            .setTitle("Allow background location")
+            .setMessage(
+                "Android 10+ requires background location access so attendance tracking " +
+                    "continues even when the app is not on screen. " +
+                    "Select \"Allow all the time\" on the next prompt for accurate logs."
+            )
+            .setPositiveButton("Continue") { _, _ ->
+                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+            .setNegativeButton("Not now", null)
+            .show()
     }
 
     private fun startTracking() {
