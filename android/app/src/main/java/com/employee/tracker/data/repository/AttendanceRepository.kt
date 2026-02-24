@@ -70,4 +70,17 @@ class AttendanceRepository @Inject constructor(
             Result.Error(e.message ?: "Network error")
         }
     }
+
+    suspend fun checkMyGeofences(latitude: Double, longitude: Double): Result<GeofenceCheckResult> {
+        return try {
+            val response = api.checkMyGeofences(latitude, longitude)
+            if (response.isSuccessful && response.body()?.data != null) {
+                Result.Success(response.body()!!.data!!)
+            } else {
+                Result.Error(response.body()?.message ?: "Failed to check geofence status")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
 }
