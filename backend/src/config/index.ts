@@ -9,6 +9,10 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function geofencePolicy(): 'WARN' | 'BLOCK' {
+  return process.env.GEOFENCE_ENFORCEMENT_POLICY?.toUpperCase() === 'BLOCK' ? 'BLOCK' : 'WARN';
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -28,5 +32,8 @@ export const config = {
     start: 9,
     end: 18,
     lateThresholdMinutes: 15,
+  },
+  geofence: {
+    enforcementPolicy: geofencePolicy(),
   },
 } as const;

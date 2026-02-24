@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma.js';
 import { success, error } from '../utils/apiResponse.js';
 import * as auditService from '../services/audit.service.js';
-import { isInsideGeofence } from '../services/location.service.js';
+import { haversineDistance, isInsideGeofence } from '../services/location.service.js';
+import { config } from '../config/index.js';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
@@ -173,6 +174,12 @@ export async function getMyGeofences(req: Request, res: Response, next: NextFunc
     if (!employeeId) {
       return error(res, 'Unauthorized', 401);
     }
+export async function checkMyGeofences(req: Request, res: Response, next: NextFunction) {
+  try {
+    const employeeId = req.user?.id;
+    const { latitude, longitude } = req.query as any;
+    const lat = Number(latitude);
+    const lon = Number(longitude);
 
     const assignments = await prisma.employeeGeofence.findMany({
       where: {
@@ -193,6 +200,34 @@ export async function getMyGeofences(req: Request, res: Response, next: NextFunc
     const geofences = assignments.map((assignment) => assignment.geofence);
 
     return success(res, geofences);
+    });
+
+    const geofences = assignments.map(({ geofence }) => {
+      const distanceMeters = Math.round(
+        haversineDistance(lat, lon, Number(geofence.latitude), Number(geofence.longitude))
+      );
+      const inside = distanceMeters <= geofence.radiusMeters;
+
+      return {
+        id: geofence.id,
+        name: geofence.name,
+        type: geofence.type,
+        latitude: Number(geofence.latitude),
+        longitude: Number(geofence.longitude),
+        radiusMeters: geofence.radiusMeters,
+        distanceMeters,
+        inside,
+      };
+    });
+
+    const insideAnyGeofence = geofences.some((item) => item.inside);
+
+    return success(res, {
+      policy: config.geofence.enforcementPolicy,
+      hasAssignedGeofences: geofences.length > 0,
+      insideAnyGeofence,
+      geofences,
+    });
   } catch (err) {
     next(err);
   }

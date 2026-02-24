@@ -16,7 +16,16 @@ import com.employee.tracker.network.model.AttendanceRecord
 import com.employee.tracker.util.Result
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.util.Locale
+import java.util.TimeZone
 
 @AndroidEntryPoint
 class AttendanceHistoryActivity : AppCompatActivity() {
@@ -60,6 +69,15 @@ class AttendanceHistoryActivity : AppCompatActivity() {
 class AttendanceAdapter : RecyclerView.Adapter<AttendanceAdapter.ViewHolder>() {
 
     private val items = mutableListOf<AttendanceRecord>()
+    private val localZone: ZoneId = ZoneId.systemDefault()
+    private val timeDisplayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+    private val dateDisplayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy", Locale.getDefault())
+    private val legacyTimestampPatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "yyyy-MM-dd HH:mm:ss"
+    )
+    private val legacyDatePatterns = listOf("yyyy-MM-dd")
 
     fun submitList(list: List<AttendanceRecord>) {
         items.clear()
@@ -82,32 +100,71 @@ class AttendanceAdapter : RecyclerView.Adapter<AttendanceAdapter.ViewHolder>() {
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-        val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-
-        try {
-            val date = parser.parse(item.date)
-            holder.tvDate.text = date?.let { dateFormat.format(it) } ?: item.date
-        } catch (e: Exception) {
-            holder.tvDate.text = item.date
-        }
+        holder.tvDate.text = parseApiDate(item.date)
+            ?.format(dateDisplayFormatter)
+            ?: item.date
 
         holder.tvStatus.text = item.status
 
         holder.tvTimeIn.text = item.timeIn?.let {
-            try {
-                val d = parser.parse(it)
-                "In: ${d?.let { t -> timeFormat.format(t) } ?: it}"
-            } catch (e: Exception) { "In: $it" }
+            val localTime = parseApiTimestamp(it)?.format(timeDisplayFormatter) ?: it
+            "In: $localTime"
         } ?: "In: --"
 
         holder.tvTimeOut.text = item.timeOut?.let {
-            try {
-                val d = parser.parse(it)
-                "Out: ${d?.let { t -> timeFormat.format(t) } ?: it}"
-            } catch (e: Exception) { "Out: $it" }
+            val localTime = parseApiTimestamp(it)?.format(timeDisplayFormatter) ?: it
+            "Out: $localTime"
         } ?: "Out: --"
+    }
+
+    private fun parseApiTimestamp(rawValue: String): ZonedDateTime? {
+        val value = rawValue.trim()
+
+        try {
+            return Instant.parse(value).atZone(localZone)
+        } catch (_: DateTimeParseException) {
+        }
+
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(localZone)
+        } catch (_: DateTimeParseException) {
+        }
+
+        legacyTimestampPatterns.forEach { pattern ->
+            try {
+                return LocalDateTime.parse(value, DateTimeFormatter.ofPattern(pattern, Locale.US)).atZone(localZone)
+            } catch (_: DateTimeParseException) {
+            }
+
+            try {
+                val parser = SimpleDateFormat(pattern, Locale.US).apply {
+                    timeZone = TimeZone.getDefault()
+                    isLenient = false
+                }
+                val date = parser.parse(value)
+                if (date != null) {
+                    return date.toInstant().atZone(localZone)
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        return null
+    }
+
+    private fun parseApiDate(rawValue: String): ZonedDateTime? {
+        parseApiTimestamp(rawValue)?.let { return it }
+
+        val value = rawValue.trim()
+        legacyDatePatterns.forEach { pattern ->
+            try {
+                return LocalDate.parse(value, DateTimeFormatter.ofPattern(pattern, Locale.US))
+                    .atStartOfDay(localZone)
+            } catch (_: DateTimeParseException) {
+            }
+        }
+
+        return null
     }
 
     override fun getItemCount() = items.size

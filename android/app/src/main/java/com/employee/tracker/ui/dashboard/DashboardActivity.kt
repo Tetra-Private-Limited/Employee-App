@@ -16,6 +16,9 @@ import androidx.core.content.ContextCompat
 import com.employee.tracker.databinding.ActivityDashboardBinding
 import com.employee.tracker.network.model.AttendanceRecord
 import com.employee.tracker.network.model.EmployeeInfo
+import com.employee.tracker.network.model.GeofenceCheckResult
+import com.employee.tracker.data.repository.AttendanceRepository
+import com.employee.tracker.service.AttendanceReplayWorker
 import com.employee.tracker.service.LocationSyncWorker
 import com.employee.tracker.service.LocationTrackingService
 import com.employee.tracker.ui.attendance.AttendanceHistoryActivity
@@ -25,7 +28,15 @@ import com.employee.tracker.util.Result
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.util.Locale
+import java.util.TimeZone
 
 @AndroidEntryPoint
 class DashboardActivity : AppCompatActivity() {
@@ -33,6 +44,13 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDashboardBinding
     private val viewModel: DashboardViewModel by viewModels()
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val localZone: ZoneId = ZoneId.systemDefault()
+    private val localTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+    private val legacyTimestampPatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "yyyy-MM-dd HH:mm:ss"
+    )
 
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -70,12 +88,17 @@ class DashboardActivity : AppCompatActivity() {
         viewModel.loadProfile()
         viewModel.loadTodayAttendance()
         viewModel.loadPendingCount()
+        viewModel.loadPendingAttendanceActionCount()
+        AttendanceReplayWorker.enqueuePeriodic(this)
+        AttendanceReplayWorker.enqueueImmediate(this)
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.loadTodayAttendance()
         viewModel.loadPendingCount()
+        viewModel.loadPendingAttendanceActionCount()
+        AttendanceReplayWorker.enqueueImmediate(this)
     }
 
     private fun setupUI() {
@@ -134,11 +157,47 @@ class DashboardActivity : AppCompatActivity() {
                     binding.btnClockIn.isEnabled = true
                     binding.btnClockOut.isEnabled = true
                     Toast.makeText(this, "Success", Toast.LENGTH_SHORT).show()
+                    AttendanceReplayWorker.enqueueImmediate(this)
+                    viewModel.loadPendingAttendanceActionCount()
                 }
                 is Result.Error -> {
                     binding.btnClockIn.isEnabled = true
                     binding.btnClockOut.isEnabled = true
                     Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                    if (result.message == AttendanceRepository.PENDING_ATTENDANCE_ACTION_MESSAGE) {
+                        AttendanceReplayWorker.enqueueImmediate(this)
+                    }
+                    viewModel.loadPendingAttendanceActionCount()
+                }
+            }
+        }
+
+        viewModel.clockActionGate.observe(this) { result ->
+            when (result) {
+                is Result.Loading -> {
+                    binding.btnClockIn.isEnabled = false
+                    binding.btnClockOut.isEnabled = false
+                }
+                is Result.Error -> {
+                    binding.btnClockIn.isEnabled = true
+                    binding.btnClockOut.isEnabled = true
+                    Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                }
+                is Result.Success -> {
+                    binding.btnClockIn.isEnabled = true
+                    binding.btnClockOut.isEnabled = true
+
+                    val gate = result.data
+                    updateGeofenceStatus(gate.geofenceCheck)
+                    maybeShowGeofenceDialog(gate.geofenceCheck)
+
+                    if (gate.allowed) {
+                        if (gate.isClockIn) {
+                            viewModel.clockIn(gate.latitude, gate.longitude)
+                        } else {
+                            viewModel.clockOut(gate.latitude, gate.longitude)
+                        }
+                    }
                 }
             }
         }
@@ -146,6 +205,10 @@ class DashboardActivity : AppCompatActivity() {
         viewModel.pendingLocations.observe(this) { count ->
             binding.tvPendingLocations.text = "Pending sync: $count locations"
             binding.btnSyncLocations.visibility = if (count > 0) View.VISIBLE else View.GONE
+        }
+
+        viewModel.pendingAttendanceActions.observe(this) { count ->
+            binding.tvPendingAttendanceActions.text = "Pending attendance action: $count"
         }
     }
 
@@ -157,8 +220,6 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun updateAttendanceUI(attendance: AttendanceRecord?) {
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-
         if (attendance == null) {
             binding.tvClockInTime.text = "Not clocked in"
             binding.tvClockOutTime.text = "--"
@@ -171,23 +232,17 @@ class DashboardActivity : AppCompatActivity() {
         binding.tvAttendanceStatus.text = attendance.status
 
         if (attendance.timeIn != null) {
-            try {
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                val date = parser.parse(attendance.timeIn)
-                binding.tvClockInTime.text = "In: ${date?.let { timeFormat.format(it) } ?: attendance.timeIn}"
-            } catch (e: Exception) {
-                binding.tvClockInTime.text = "In: ${attendance.timeIn}"
-            }
+            val inText = parseApiTimestamp(attendance.timeIn)
+                ?.format(localTimeFormatter)
+                ?: attendance.timeIn
+            binding.tvClockInTime.text = "In: $inText"
         }
 
         if (attendance.timeOut != null) {
-            try {
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                val date = parser.parse(attendance.timeOut)
-                binding.tvClockOutTime.text = "Out: ${date?.let { timeFormat.format(it) } ?: attendance.timeOut}"
-            } catch (e: Exception) {
-                binding.tvClockOutTime.text = "Out: ${attendance.timeOut}"
-            }
+            val outText = parseApiTimestamp(attendance.timeOut)
+                ?.format(localTimeFormatter)
+                ?: attendance.timeOut
+            binding.tvClockOutTime.text = "Out: $outText"
             binding.btnClockIn.visibility = View.GONE
             binding.btnClockOut.visibility = View.GONE
         } else {
@@ -195,6 +250,41 @@ class DashboardActivity : AppCompatActivity() {
             binding.btnClockIn.visibility = View.GONE
             binding.btnClockOut.visibility = View.VISIBLE
         }
+    }
+
+    private fun parseApiTimestamp(rawValue: String): ZonedDateTime? {
+        val value = rawValue.trim()
+
+        try {
+            return Instant.parse(value).atZone(localZone)
+        } catch (_: DateTimeParseException) {
+        }
+
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(localZone)
+        } catch (_: DateTimeParseException) {
+        }
+
+        legacyTimestampPatterns.forEach { pattern ->
+            try {
+                return LocalDateTime.parse(value, DateTimeFormatter.ofPattern(pattern, Locale.US)).atZone(localZone)
+            } catch (_: DateTimeParseException) {
+            }
+
+            try {
+                val parser = SimpleDateFormat(pattern, Locale.US).apply {
+                    timeZone = TimeZone.getDefault()
+                    isLenient = false
+                }
+                val date = parser.parse(value)
+                if (date != null) {
+                    return date.toInstant().atZone(localZone)
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        return null
     }
 
     private fun performClockAction(isClockIn: Boolean) {
@@ -208,11 +298,7 @@ class DashboardActivity : AppCompatActivity() {
         try {
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
-                    if (isClockIn) {
-                        viewModel.clockIn(location.latitude, location.longitude)
-                    } else {
-                        viewModel.clockOut(location.latitude, location.longitude)
-                    }
+                    viewModel.prepareClockAction(isClockIn, location.latitude, location.longitude)
                 } else {
                     Toast.makeText(this, "Unable to get location. Try again.", Toast.LENGTH_SHORT).show()
                 }
@@ -220,6 +306,29 @@ class DashboardActivity : AppCompatActivity() {
         } catch (e: SecurityException) {
             Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun updateGeofenceStatus(result: GeofenceCheckResult) {
+        val statusText = when {
+            !result.hasAssignedGeofences -> "Geofence: No assigned area"
+            result.insideAnyGeofence -> "Geofence: Inside assigned area"
+            else -> "Geofence: Outside assigned area"
+        }
+
+        binding.tvGeofenceStatus.text = "$statusText (${result.policy})"
+    }
+
+    private fun maybeShowGeofenceDialog(result: GeofenceCheckResult) {
+        if (!result.hasAssignedGeofences || result.insideAnyGeofence) return
+
+        val geofenceNames = result.geofences.joinToString { it.name }
+        val action = if (result.policy == "BLOCK") "blocked" else "allowed with warning"
+
+        AlertDialog.Builder(this)
+            .setTitle("Geofence Check")
+            .setMessage("You are outside assigned geofence(s): $geofenceNames\nPolicy: ${result.policy}\nClock action is $action.")
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun requestPermissions() {

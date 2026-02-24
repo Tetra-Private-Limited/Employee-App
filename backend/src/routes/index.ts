@@ -39,7 +39,7 @@ router.delete('/employees/:id', authenticate, authorize('ADMIN'), employeeCtrl.s
 router.post('/attendance/time-in', authenticate, validate(timeInSchema), attendanceCtrl.timeIn);
 router.post('/attendance/time-out', authenticate, validate(timeOutSchema), attendanceCtrl.timeOut);
 router.get('/attendance/today', authenticate, attendanceCtrl.getToday);
-router.get('/attendance', authenticate, attendanceCtrl.listAttendance);
+router.get('/attendance', authenticate, validateQuery(attendanceQuerySchema), attendanceCtrl.listAttendance);
 
 // ─── Location Routes ─────────────────────────────────────
 router.post('/locations/batch', authenticate, validate(locationBatchSchema), locationCtrl.batchUpload);
@@ -49,12 +49,13 @@ router.get('/locations/route', authenticate, authorize('ADMIN', 'MANAGER'), loca
 // ─── Geofence Routes ─────────────────────────────────────
 router.get('/geofences', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.list);
 router.get('/geofences/my', authenticate, geofenceCtrl.getMyGeofences);
+router.get('/geofences/check', authenticate, validateQuery(checkGeofenceSchema), geofenceCtrl.checkMyGeofences);
 router.get('/geofences/:id', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.getById);
 router.post('/geofences', authenticate, authorize('ADMIN'), validate(createGeofenceSchema), geofenceCtrl.create);
 router.put('/geofences/:id', authenticate, authorize('ADMIN'), validate(updateGeofenceSchema), geofenceCtrl.update);
 router.delete('/geofences/:id', authenticate, authorize('ADMIN'), geofenceCtrl.softDelete);
 router.post('/geofences/:id/assign', authenticate, authorize('ADMIN'), validate(assignGeofenceSchema), geofenceCtrl.assignEmployees);
-router.get('/geofences/:id/check', authenticate, geofenceCtrl.checkLocation);
+router.get('/geofences/:id/check', authenticate, validateQuery(checkGeofenceSchema), geofenceCtrl.checkLocation);
 
 // ─── Report Routes ───────────────────────────────────────
 router.get('/reports/dashboard', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getDashboardStats);
