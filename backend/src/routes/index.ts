@@ -48,6 +48,7 @@ router.get('/locations/route', authenticate, authorize('ADMIN', 'MANAGER'), loca
 
 // ─── Geofence Routes ─────────────────────────────────────
 router.get('/geofences', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.list);
+router.get('/geofences/my', authenticate, geofenceCtrl.getMyGeofences);
 router.get('/geofences/:id', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.getById);
 router.post('/geofences', authenticate, authorize('ADMIN'), validate(createGeofenceSchema), geofenceCtrl.create);
 router.put('/geofences/:id', authenticate, authorize('ADMIN'), validate(updateGeofenceSchema), geofenceCtrl.update);

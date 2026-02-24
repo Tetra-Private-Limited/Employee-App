@@ -165,3 +165,35 @@ export async function checkLocation(req: Request, res: Response, next: NextFunct
     next(err);
   }
 }
+
+export async function getMyGeofences(req: Request, res: Response, next: NextFunction) {
+  try {
+    const employeeId = req.user?.id;
+
+    if (!employeeId) {
+      return error(res, 'Unauthorized', 401);
+    }
+
+    const assignments = await prisma.employeeGeofence.findMany({
+      where: {
+        employeeId,
+        geofence: {
+          deletedAt: null,
+          isActive: true,
+        },
+      },
+      include: {
+        geofence: true,
+      },
+      orderBy: {
+        assignedAt: 'desc',
+      },
+    });
+
+    const geofences = assignments.map((assignment) => assignment.geofence);
+
+    return success(res, geofences);
+  } catch (err) {
+    next(err);
+  }
+}
