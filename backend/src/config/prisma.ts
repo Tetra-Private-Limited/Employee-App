@@ -1,8 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { config } from './index.js';
 
-const prisma = new PrismaClient({
-  log: config.nodeEnv === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+// Prevent multiple PrismaClient instances in development (hot-reload)
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-export { prisma };
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: config.nodeEnv === 'development' ? ['error', 'warn'] : ['error'],
+  });
+
+if (config.nodeEnv !== 'production') globalForPrisma.prisma = prisma;

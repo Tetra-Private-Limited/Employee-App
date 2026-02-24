@@ -100,13 +100,13 @@ model Employee {
 model Attendance {
   id                 String           @id @default(uuid())
   employeeId         String           @map("employee_id")
-  date               DateTime         @db.Date
+  date               DateTime        
   timeIn             DateTime?        @map("time_in")
   timeOut            DateTime?        @map("time_out")
-  timeInLatitude     Decimal?         @map("time_in_latitude") @db.Decimal(10, 7)
-  timeInLongitude    Decimal?         @map("time_in_longitude") @db.Decimal(10, 7)
-  timeOutLatitude    Decimal?         @map("time_out_latitude") @db.Decimal(10, 7)
-  timeOutLongitude   Decimal?         @map("time_out_longitude") @db.Decimal(10, 7)
+  timeInLatitude     Decimal?         @map("time_in_latitude")
+  timeInLongitude    Decimal?         @map("time_in_longitude")
+  timeOutLatitude    Decimal?         @map("time_out_latitude")
+  timeOutLongitude   Decimal?         @map("time_out_longitude")
   status             AttendanceStatus @default(PRESENT)
   notes              String?
   createdAt          DateTime         @default(now()) @map("created_at")
@@ -123,8 +123,8 @@ model Attendance {
 model LocationRecord {
   id              String    @id @default(uuid())
   employeeId      String    @map("employee_id")
-  latitude        Decimal   @db.Decimal(10, 7)
-  longitude       Decimal   @db.Decimal(10, 7)
+  latitude        Decimal  
+  longitude       Decimal  
   accuracy        Float?
   altitude        Float?
   speed           Float?
@@ -160,8 +160,8 @@ model LocationRecord {
 model Geofence {
   id           String       @id @default(uuid())
   name         String
-  latitude     Decimal      @db.Decimal(10, 7)
-  longitude    Decimal      @db.Decimal(10, 7)
+  latitude     Decimal     
+  longitude    Decimal     
   radiusMeters Int          @default(100) @map("radius_meters")
   type         GeofenceType @default(OFFICE)
   isActive     Boolean      @default(true) @map("is_active")
@@ -224,14 +224,14 @@ model AuditLog {
 model DailyRouteSummary {
   id              String   @id @default(uuid())
   employeeId      String   @map("employee_id")
-  date            DateTime @db.Date
-  totalDistanceKm Decimal  @map("total_distance_km") @db.Decimal(10, 3)
+  date            DateTime
+  totalDistanceKm Decimal  @map("total_distance_km")
   activeMinutes   Int      @map("active_minutes")
   stopsCount      Int      @default(0) @map("stops_count")
-  firstLatitude   Decimal? @map("first_latitude") @db.Decimal(10, 7)
-  firstLongitude  Decimal? @map("first_longitude") @db.Decimal(10, 7)
-  lastLatitude    Decimal? @map("last_latitude") @db.Decimal(10, 7)
-  lastLongitude   Decimal? @map("last_longitude") @db.Decimal(10, 7)
+  firstLatitude   Decimal? @map("first_latitude")
+  firstLongitude  Decimal? @map("first_longitude")
+  lastLatitude    Decimal? @map("last_latitude")
+  lastLongitude   Decimal? @map("last_longitude")
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@unique([employeeId, date])
