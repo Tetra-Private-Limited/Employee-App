@@ -167,6 +167,13 @@ export async function checkLocation(req: Request, res: Response, next: NextFunct
   }
 }
 
+export async function getMyGeofences(req: Request, res: Response, next: NextFunction) {
+  try {
+    const employeeId = req.user?.id;
+
+    if (!employeeId) {
+      return error(res, 'Unauthorized', 401);
+    }
 export async function checkMyGeofences(req: Request, res: Response, next: NextFunction) {
   try {
     const employeeId = req.user?.id;
@@ -185,6 +192,14 @@ export async function checkMyGeofences(req: Request, res: Response, next: NextFu
       include: {
         geofence: true,
       },
+      orderBy: {
+        assignedAt: 'desc',
+      },
+    });
+
+    const geofences = assignments.map((assignment) => assignment.geofence);
+
+    return success(res, geofences);
     });
 
     const geofences = assignments.map(({ geofence }) => {

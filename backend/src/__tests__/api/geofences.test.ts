@@ -18,6 +18,7 @@ const mockPrisma = vi.hoisted(() => ({
   },
   employeeGeofence: {
     upsert: vi.fn(),
+    findMany: vi.fn(),
     findMany: vi.fn().mockResolvedValue([]),
   },
   auditLog: {
@@ -36,6 +37,15 @@ const app = createTestApp();
 function adminToken() {
   return jwt.sign(
     { id: 'u1', email: 'admin@test.com', role: 'ADMIN' },
+    config.jwt.accessSecret,
+    { expiresIn: '1h' }
+  );
+}
+
+
+function employeeToken() {
+  return jwt.sign(
+    { id: 'e1', email: 'employee@test.com', role: 'EMPLOYEE' },
     config.jwt.accessSecret,
     { expiresIn: '1h' }
   );
@@ -87,6 +97,51 @@ describe('Geofences API', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.data.name).toBe('Warehouse');
+    });
+  });
+
+
+  describe('GET /geofences/my', () => {
+    it('returns assigned active geofences for authenticated employee', async () => {
+      mockPrisma.employeeGeofence.findMany.mockResolvedValue([
+        {
+          employeeId: 'e1',
+          geofenceId: 'g1',
+          geofence: {
+            id: 'g1',
+            name: 'HQ',
+            latitude: 28.6139,
+            longitude: 77.209,
+            radiusMeters: 200,
+            type: 'OFFICE',
+            isActive: true,
+            deletedAt: null,
+          },
+        },
+      ]);
+
+      const res = await request(app)
+        .get('/geofences/my')
+        .set('Authorization', `Bearer ${employeeToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].id).toBe('g1');
+      expect(mockPrisma.employeeGeofence.findMany).toHaveBeenCalledWith({
+        where: {
+          employeeId: 'e1',
+          geofence: {
+            deletedAt: null,
+            isActive: true,
+          },
+        },
+        include: {
+          geofence: true,
+        },
+        orderBy: {
+          assignedAt: 'desc',
+        },
+      });
     });
   });
 
