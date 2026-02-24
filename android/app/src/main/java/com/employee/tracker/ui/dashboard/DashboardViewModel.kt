@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.employee.tracker.data.repository.AttendanceRepository
 import com.employee.tracker.data.repository.AuthRepository
 import com.employee.tracker.data.repository.LocationRepository
+import com.employee.tracker.data.tracking.TrackingHealthStats
+import com.employee.tracker.data.tracking.TrackingHealthStore
 import com.employee.tracker.network.model.AttendanceRecord
 import com.employee.tracker.network.model.EmployeeInfo
 import com.employee.tracker.network.model.GeofenceCheckResult
@@ -19,7 +21,8 @@ import javax.inject.Inject
 class DashboardViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val attendanceRepository: AttendanceRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val trackingHealthStore: TrackingHealthStore
 ) : ViewModel() {
 
     data class ClockActionGate(
@@ -42,6 +45,8 @@ class DashboardViewModel @Inject constructor(
     private val _pendingLocations = MutableLiveData<Int>()
     val pendingLocations: LiveData<Int> = _pendingLocations
 
+    private val _trackingHealth = MutableLiveData<TrackingHealthStats>()
+    val trackingHealth: LiveData<TrackingHealthStats> = _trackingHealth
     private val _clockActionGate = MutableLiveData<Result<ClockActionGate>>()
     val clockActionGate: LiveData<Result<ClockActionGate>> = _clockActionGate
     private val _pendingAttendanceActions = MutableLiveData<Int>()
@@ -104,17 +109,29 @@ class DashboardViewModel @Inject constructor(
 
     fun syncLocations() {
         viewModelScope.launch {
-            locationRepository.syncPendingLocations()
-            _pendingLocations.value = locationRepository.getPendingCount()
+            val syncResult = locationRepository.syncPendingLocations()
+            val pendingCount = locationRepository.getPendingCount()
+            _pendingLocations.value = pendingCount
+            if (syncResult is Result.Success) {
+                trackingHealthStore.recordSyncSuccess(System.currentTimeMillis(), pendingCount)
+            } else {
+                trackingHealthStore.updatePendingCount(pendingCount)
+            }
+            _trackingHealth.value = trackingHealthStore.getStats()
         }
     }
 
     fun loadPendingCount() {
         viewModelScope.launch {
-            _pendingLocations.value = locationRepository.getPendingCount()
+            val pendingCount = locationRepository.getPendingCount()
+            _pendingLocations.value = pendingCount
+            trackingHealthStore.updatePendingCount(pendingCount)
+            _trackingHealth.value = trackingHealthStore.getStats()
         }
     }
 
+    fun refreshTrackingHealth() {
+        _trackingHealth.value = trackingHealthStore.getStats()
     fun loadPendingAttendanceActionCount() {
         viewModelScope.launch {
             _pendingAttendanceActions.value = attendanceRepository.getPendingAttendanceActionCount()

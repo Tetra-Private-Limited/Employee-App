@@ -21,6 +21,7 @@ import com.employee.tracker.EmployeeTrackerApp
 import com.employee.tracker.R
 import com.employee.tracker.data.local.entity.LocationEntity
 import com.employee.tracker.data.repository.LocationRepository
+import com.employee.tracker.data.tracking.TrackingHealthStore
 import com.employee.tracker.security.DeviceInfo
 import com.employee.tracker.ui.dashboard.DashboardActivity
 import com.google.android.gms.location.*
@@ -34,6 +35,7 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
 
     @Inject lateinit var locationRepository: LocationRepository
     @Inject lateinit var deviceInfo: DeviceInfo
+    @Inject lateinit var trackingHealthStore: TrackingHealthStore
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var sensorManager: SensorManager
@@ -123,6 +125,13 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
                 recordedAt = location.time
             )
             locationRepository.saveLocationLocally(entity)
+            val pendingCount = locationRepository.getPendingCount()
+            trackingHealthStore.recordLocationEvent(
+                locationTimestamp = location.time,
+                accuracyMeters = location.accuracy,
+                isMockLocation = location.isFromMockProvider,
+                pendingCount = pendingCount
+            )
         }
     }
 
