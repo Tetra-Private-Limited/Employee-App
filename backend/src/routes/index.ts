@@ -48,12 +48,13 @@ router.get('/locations/route', authenticate, authorize('ADMIN', 'MANAGER'), loca
 
 // ─── Geofence Routes ─────────────────────────────────────
 router.get('/geofences', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.list);
+router.get('/geofences/check', authenticate, validateQuery(checkGeofenceSchema), geofenceCtrl.checkMyGeofences);
 router.get('/geofences/:id', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.getById);
 router.post('/geofences', authenticate, authorize('ADMIN'), validate(createGeofenceSchema), geofenceCtrl.create);
 router.put('/geofences/:id', authenticate, authorize('ADMIN'), validate(updateGeofenceSchema), geofenceCtrl.update);
 router.delete('/geofences/:id', authenticate, authorize('ADMIN'), geofenceCtrl.softDelete);
 router.post('/geofences/:id/assign', authenticate, authorize('ADMIN'), validate(assignGeofenceSchema), geofenceCtrl.assignEmployees);
-router.get('/geofences/:id/check', authenticate, geofenceCtrl.checkLocation);
+router.get('/geofences/:id/check', authenticate, validateQuery(checkGeofenceSchema), geofenceCtrl.checkLocation);
 
 // ─── Report Routes ───────────────────────────────────────
 router.get('/reports/dashboard', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getDashboardStats);

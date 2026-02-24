@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.employee.tracker.databinding.ActivityDashboardBinding
 import com.employee.tracker.network.model.AttendanceRecord
 import com.employee.tracker.network.model.EmployeeInfo
+import com.employee.tracker.network.model.GeofenceCheckResult
 import com.employee.tracker.data.repository.AttendanceRepository
 import com.employee.tracker.service.AttendanceReplayWorker
 import com.employee.tracker.service.LocationSyncWorker
@@ -156,6 +157,36 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
+        viewModel.clockActionGate.observe(this) { result ->
+            when (result) {
+                is Result.Loading -> {
+                    binding.btnClockIn.isEnabled = false
+                    binding.btnClockOut.isEnabled = false
+                }
+                is Result.Error -> {
+                    binding.btnClockIn.isEnabled = true
+                    binding.btnClockOut.isEnabled = true
+                    Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                }
+                is Result.Success -> {
+                    binding.btnClockIn.isEnabled = true
+                    binding.btnClockOut.isEnabled = true
+
+                    val gate = result.data
+                    updateGeofenceStatus(gate.geofenceCheck)
+                    maybeShowGeofenceDialog(gate.geofenceCheck)
+
+                    if (gate.allowed) {
+                        if (gate.isClockIn) {
+                            viewModel.clockIn(gate.latitude, gate.longitude)
+                        } else {
+                            viewModel.clockOut(gate.latitude, gate.longitude)
+                        }
+                    }
+                }
+            }
+        }
+
         viewModel.pendingLocations.observe(this) { count ->
             binding.tvPendingLocations.text = "Pending sync: $count locations"
             binding.btnSyncLocations.visibility = if (count > 0) View.VISIBLE else View.GONE
@@ -225,11 +256,7 @@ class DashboardActivity : AppCompatActivity() {
         try {
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
-                    if (isClockIn) {
-                        viewModel.clockIn(location.latitude, location.longitude)
-                    } else {
-                        viewModel.clockOut(location.latitude, location.longitude)
-                    }
+                    viewModel.prepareClockAction(isClockIn, location.latitude, location.longitude)
                 } else {
                     Toast.makeText(this, "Unable to get location. Try again.", Toast.LENGTH_SHORT).show()
                 }
@@ -237,6 +264,29 @@ class DashboardActivity : AppCompatActivity() {
         } catch (e: SecurityException) {
             Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun updateGeofenceStatus(result: GeofenceCheckResult) {
+        val statusText = when {
+            !result.hasAssignedGeofences -> "Geofence: No assigned area"
+            result.insideAnyGeofence -> "Geofence: Inside assigned area"
+            else -> "Geofence: Outside assigned area"
+        }
+
+        binding.tvGeofenceStatus.text = "$statusText (${result.policy})"
+    }
+
+    private fun maybeShowGeofenceDialog(result: GeofenceCheckResult) {
+        if (!result.hasAssignedGeofences || result.insideAnyGeofence) return
+
+        val geofenceNames = result.geofences.joinToString { it.name }
+        val action = if (result.policy == "BLOCK") "blocked" else "allowed with warning"
+
+        AlertDialog.Builder(this)
+            .setTitle("Geofence Check")
+            .setMessage("You are outside assigned geofence(s): $geofenceNames\nPolicy: ${result.policy}\nClock action is $action.")
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun requestPermissions() {

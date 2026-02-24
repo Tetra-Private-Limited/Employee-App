@@ -18,6 +18,7 @@ const mockPrisma = vi.hoisted(() => ({
   },
   employeeGeofence: {
     upsert: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
   },
   auditLog: {
     create: vi.fn().mockResolvedValue({}),
@@ -122,6 +123,36 @@ describe('Geofences API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.inside).toBe(false);
+    });
+  });
+
+  describe('GET /geofences/check', () => {
+    it('returns user geofence checks with policy', async () => {
+      mockPrisma.employeeGeofence.findMany.mockResolvedValue([
+        {
+          geofence: {
+            id: 'g1',
+            name: 'HQ',
+            type: 'OFFICE',
+            latitude: 28.6139,
+            longitude: 77.209,
+            radiusMeters: 300,
+            isActive: true,
+            deletedAt: null,
+          },
+        },
+      ]);
+
+      const res = await request(app)
+        .get('/geofences/check?latitude=28.6139&longitude=77.209')
+        .set('Authorization', `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.policy).toBeTypeOf('string');
+      expect(res.body.data.hasAssignedGeofences).toBe(true);
+      expect(res.body.data.insideAnyGeofence).toBe(true);
+      expect(res.body.data.geofences).toHaveLength(1);
+      expect(res.body.data.geofences[0].inside).toBe(true);
     });
   });
 });
