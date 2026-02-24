@@ -14,6 +14,11 @@ import { PageLoader, EmptyState } from '@/components/ui/loading';
 import { MapView } from '@/components/map/map-container';
 import { CreateGeofenceForm, GeofenceType } from '@/lib/types';
 
+type CreateGeofenceDraft = Omit<CreateGeofenceForm, 'latitude' | 'longitude'> & {
+  latitude: number | null;
+  longitude: number | null;
+};
+
 const typeOptions = [
   { value: 'OFFICE', label: 'Office' },
   { value: 'CLIENT', label: 'Client' },
@@ -24,13 +29,14 @@ const typeOptions = [
 export default function GeofencesPage() {
   const { geofences, loading, createGeofence, updateGeofence, deleteGeofence } = useGeofences();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [formData, setFormData] = useState<CreateGeofenceForm>({
+  const [formData, setFormData] = useState<CreateGeofenceDraft>({
     name: '',
-    latitude: 0,
-    longitude: 0,
+    latitude: null,
+    longitude: null,
     radiusMeters: 100,
     type: 'OFFICE',
   });
+  const [hasSelectedLocation, setHasSelectedLocation] = useState(false);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -46,7 +52,26 @@ export default function GeofencesPage() {
   const handleMapClick = (lat: number, lng: number) => {
     if (showCreateModal) {
       setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+      setHasSelectedLocation(true);
     }
+  };
+
+  const parseCoordinateInput = (value: string): number | null => {
+    if (!value.trim()) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const updateLatitude = (value: string) => {
+    const nextLatitude = parseCoordinateInput(value);
+    setFormData((prev) => ({ ...prev, latitude: nextLatitude }));
+    setHasSelectedLocation(nextLatitude !== null && formData.longitude !== null);
+  };
+
+  const updateLongitude = (value: string) => {
+    const nextLongitude = parseCoordinateInput(value);
+    setFormData((prev) => ({ ...prev, longitude: nextLongitude }));
+    setHasSelectedLocation(formData.latitude !== null && nextLongitude !== null);
   };
 
   const handleCreate = async () => {
@@ -54,7 +79,7 @@ export default function GeofencesPage() {
       setFormError('Name is required');
       return;
     }
-    if (formData.latitude === 0 && formData.longitude === 0) {
+    if (!hasSelectedLocation || formData.latitude === null || formData.longitude === null) {
       setFormError('Click on the map to set location');
       return;
     }
@@ -62,9 +87,10 @@ export default function GeofencesPage() {
     try {
       setSaving(true);
       setFormError('');
-      await createGeofence(formData);
+      await createGeofence({ ...formData, latitude: formData.latitude, longitude: formData.longitude });
       setShowCreateModal(false);
-      setFormData({ name: '', latitude: 0, longitude: 0, radiusMeters: 100, type: 'OFFICE' });
+      setFormData({ name: '', latitude: null, longitude: null, radiusMeters: 100, type: 'OFFICE' });
+      setHasSelectedLocation(false);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to create geofence');
     } finally {
@@ -188,14 +214,17 @@ export default function GeofencesPage() {
 
           <MapView
             className="h-[250px] rounded-lg"
-            onMapClick={(lat, lng) => setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }))}
+            onMapClick={(lat, lng) => {
+              setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+              setHasSelectedLocation(true);
+            }}
             markers={
-              formData.latitude !== 0
+              hasSelectedLocation && formData.latitude !== null && formData.longitude !== null
                 ? [{ id: 'new', latitude: formData.latitude, longitude: formData.longitude, label: formData.name || 'New Geofence' }]
                 : []
             }
             circles={
-              formData.latitude !== 0
+              hasSelectedLocation && formData.latitude !== null && formData.longitude !== null
                 ? [{ center: [formData.latitude, formData.longitude], radius: formData.radiusMeters, label: formData.name }]
                 : []
             }
@@ -222,15 +251,15 @@ export default function GeofencesPage() {
               label="Latitude"
               type="number"
               step="any"
-              value={formData.latitude || ''}
-              onChange={(e) => setFormData((prev) => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
+              value={formData.latitude ?? ''}
+              onChange={(e) => updateLatitude(e.target.value)}
             />
             <Input
               label="Longitude"
               type="number"
               step="any"
-              value={formData.longitude || ''}
-              onChange={(e) => setFormData((prev) => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
+              value={formData.longitude ?? ''}
+              onChange={(e) => updateLongitude(e.target.value)}
             />
             <Input
               label="Radius (meters)"
