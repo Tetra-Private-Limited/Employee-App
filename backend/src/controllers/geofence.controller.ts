@@ -174,12 +174,6 @@ export async function getMyGeofences(req: Request, res: Response, next: NextFunc
     if (!employeeId) {
       return error(res, 'Unauthorized', 401);
     }
-export async function checkMyGeofences(req: Request, res: Response, next: NextFunction) {
-  try {
-    const employeeId = req.user?.id;
-    const { latitude, longitude } = req.query as any;
-    const lat = Number(latitude);
-    const lon = Number(longitude);
 
     const assignments = await prisma.employeeGeofence.findMany({
       where: {
@@ -200,6 +194,36 @@ export async function checkMyGeofences(req: Request, res: Response, next: NextFu
     const geofences = assignments.map((assignment) => assignment.geofence);
 
     return success(res, geofences);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function checkMyGeofences(req: Request, res: Response, next: NextFunction) {
+  try {
+    const employeeId = req.user?.id;
+    const { latitude, longitude } = req.query as any;
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+
+    if (!employeeId) {
+      return error(res, 'Unauthorized', 401);
+    }
+
+    const assignments = await prisma.employeeGeofence.findMany({
+      where: {
+        employeeId,
+        geofence: {
+          deletedAt: null,
+          isActive: true,
+        },
+      },
+      include: {
+        geofence: true,
+      },
+      orderBy: {
+        assignedAt: 'desc',
+      },
     });
 
     const geofences = assignments.map(({ geofence }) => {
