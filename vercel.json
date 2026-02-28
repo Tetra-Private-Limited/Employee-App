@@ -1,9 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "admin-portal/package.json",
-      "use": "@vercel/next"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm --prefix admin-portal install",
+  "buildCommand": "npm --prefix admin-portal run build",
+  "devCommand": "npm --prefix admin-portal run dev",
+  "outputDirectory": "admin-portal/.next"
 }
