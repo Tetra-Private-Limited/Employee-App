@@ -53,7 +53,7 @@ export default function ReportsPage() {
   );
 
   const pieData = Object.entries(statusBreakdown).map(([status, count]) => ({
-    status: status.replace('_', ' '),
+    status,
     count,
   }));
 
@@ -61,13 +61,14 @@ export default function ReportsPage() {
   const deptMap = report.reduce(
     (acc, r) => {
       const dept = r.department || 'Unassigned';
-      if (!acc[dept]) acc[dept] = { present: 0, late: 0, absent: 0 };
+      if (!acc[dept]) acc[dept] = { present: 0, late: 0, absent: 0, halfDay: 0 };
       if (r.status === 'PRESENT') acc[dept].present++;
       else if (r.status === 'LATE') acc[dept].late++;
       else if (r.status === 'ABSENT') acc[dept].absent++;
+      else if (r.status === 'HALF_DAY') acc[dept].halfDay++;
       return acc;
     },
-    {} as Record<string, { present: number; late: number; absent: number }>
+    {} as Record<string, { present: number; late: number; absent: number; halfDay: number }>
   );
 
   const deptData = Object.entries(deptMap).map(([department, counts]) => ({
@@ -199,7 +200,7 @@ export default function ReportsPage() {
                         <TableCell>{formatTime(rec.timeOut)}</TableCell>
                         <TableCell>{formatDuration(rec.duration)}</TableCell>
                         <TableCell>
-                          <Badge variant={rec.status}>{rec.status.replace('_', ' ')}</Badge>
+                          <Badge variant={rec.status}>{rec.status.replace(/_/g, ' ')}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -73,12 +73,20 @@ export default function GeofencesPage() {
   };
 
   const handleToggle = async (id: string, isActive: boolean) => {
-    await updateGeofence(id, { isActive: !isActive });
+    try {
+      await updateGeofence(id, { isActive: !isActive });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to toggle geofence');
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`Delete geofence "${name}"?`)) {
-      await deleteGeofence(id);
+      try {
+        await deleteGeofence(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to delete geofence');
+      }
     }
   };
 

@@ -51,6 +51,8 @@ function MapInner({
 }: MapContainerProps) {
   const mapRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   useEffect(() => {
     if (!containerRef.current || !L) return;
@@ -62,11 +64,9 @@ function MapInner({
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(mapRef.current);
 
-      if (onMapClick) {
-        mapRef.current.on('click', (e: any) => {
-          onMapClick(e.latlng.lat, e.latlng.lng);
-        });
-      }
+      mapRef.current.on('click', (e: any) => {
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      });
     }
 
     return () => {

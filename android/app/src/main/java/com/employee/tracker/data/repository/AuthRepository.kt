@@ -5,6 +5,7 @@ import com.employee.tracker.network.model.*
 import com.employee.tracker.security.DeviceInfo
 import com.employee.tracker.security.TokenManager
 import com.employee.tracker.util.Result
+import com.employee.tracker.util.parseErrorMessage
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,7 +31,7 @@ class AuthRepository @Inject constructor(
                 tokenManager.saveEmployeeId(data.employee.id)
                 Result.Success(data)
             } else {
-                Result.Error(response.body()?.message ?: "Login failed")
+                Result.Error(parseErrorMessage(response, "Login failed"))
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")
@@ -43,7 +44,7 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.data != null) {
                 Result.Success(response.body()!!.data!!)
             } else {
-                Result.Error(response.body()?.message ?: "Failed to fetch profile")
+                Result.Error(parseErrorMessage(response, "Failed to fetch profile"))
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")
@@ -56,7 +57,7 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful) {
                 Result.Success(Unit)
             } else {
-                Result.Error(response.body()?.message ?: "Failed to change password")
+                Result.Error(parseErrorMessage(response, "Failed to change password"))
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")

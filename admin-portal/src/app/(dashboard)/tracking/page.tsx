@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/loading';
 import { MapView } from '@/components/map/map-container';
-import { formatTime } from '@/lib/utils';
+import { formatTime, escapeHtml } from '@/lib/utils';
 import Link from 'next/link';
 
 export default function TrackingPage() {
@@ -18,8 +18,8 @@ export default function TrackingPage() {
     longitude: loc.longitude,
     label: loc.employeeName,
     popup: `
-      <strong>${loc.employeeName}</strong><br/>
-      ${loc.employeeCode}<br/>
+      <strong>${escapeHtml(loc.employeeName)}</strong><br/>
+      ${escapeHtml(loc.employeeCode)}<br/>
       Battery: ${loc.batteryLevel !== null ? `${loc.batteryLevel}%` : 'N/A'}<br/>
       Speed: ${loc.speed !== null ? `${loc.speed.toFixed(1)} m/s` : 'N/A'}<br/>
       Last update: ${formatTime(loc.recordedAt)}

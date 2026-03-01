@@ -40,10 +40,14 @@ class DashboardActivity : AppCompatActivity() {
         val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         if (fineGranted) {
             startTracking()
-            requestBackgroundLocationIfNeeded()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                requestBackgroundLocationIfNeeded()
+            }
         } else {
             Toast.makeText(this, "Location permission is required", Toast.LENGTH_LONG).show()
         }
+        // Request notification permission after location permission dialog completes
+        requestNotificationPermissionIfNeeded()
     }
 
     private val backgroundLocationLauncher = registerForActivityResult(
@@ -228,13 +232,14 @@ class DashboardActivity : AppCompatActivity() {
             Manifest.permission.ACCESS_COARSE_LOCATION
         )
         locationPermissionLauncher.launch(permissions.toTypedArray())
+    }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
-            ) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 

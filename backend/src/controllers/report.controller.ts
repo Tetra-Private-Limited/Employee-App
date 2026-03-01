@@ -43,19 +43,28 @@ export async function exportAttendanceCsv(req: Request, res: Response, next: Nex
 
     // Convert to CSV string
     if (csvData.length === 0) {
-      return success(res, '');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="attendance-report.csv"`);
+      return res.send('');
     }
+
+    const escapeCsvField = (val: unknown): string => {
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
 
     const headers = Object.keys(csvData[0]);
     const rows = csvData.map((row) =>
-      headers.map((h) => {
-        const val = (row as any)[h];
-        return typeof val === 'string' && val.includes(',') ? `"${val}"` : String(val);
-      }).join(',')
+      headers.map((h) => escapeCsvField((row as any)[h])).join(',')
     );
 
     const csv = [headers.join(','), ...rows].join('\n');
-    return success(res, csv);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-report.csv"`);
+    return res.send(csv);
   } catch (err) {
     next(err);
   }

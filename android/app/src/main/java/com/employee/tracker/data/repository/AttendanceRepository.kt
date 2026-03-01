@@ -4,6 +4,7 @@ import com.employee.tracker.network.ApiService
 import com.employee.tracker.network.model.*
 import com.employee.tracker.security.DeviceInfo
 import com.employee.tracker.util.Result
+import com.employee.tracker.util.parseErrorMessage
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,7 +21,7 @@ class AttendanceRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.data != null) {
                 Result.Success(response.body()!!.data!!)
             } else {
-                Result.Error(response.body()?.message ?: "Clock-in failed")
+                Result.Error(parseErrorMessage(response, "Clock-in failed"))
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")
@@ -33,7 +34,7 @@ class AttendanceRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.data != null) {
                 Result.Success(response.body()!!.data!!)
             } else {
-                Result.Error(response.body()?.message ?: "Clock-out failed")
+                Result.Error(parseErrorMessage(response, "Clock-out failed"))
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")
@@ -46,7 +47,7 @@ class AttendanceRepository @Inject constructor(
             if (response.isSuccessful) {
                 Result.Success(response.body()?.data)
             } else {
-                Result.Error(response.body()?.message ?: "Failed to fetch attendance")
+                Result.Error(parseErrorMessage(response, "Failed to fetch attendance"))
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")

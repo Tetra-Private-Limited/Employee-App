@@ -24,6 +24,7 @@ export function useRecentLocations() {
 
   const fetchLocations = useCallback(async () => {
     try {
+      setLoading(true);
       setError(null);
       const res = await api.get<ApiResponse<EmployeeLocation[]>>('/locations/recent');
       setLocations(res.data);

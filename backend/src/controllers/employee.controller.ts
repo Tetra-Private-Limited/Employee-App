@@ -26,7 +26,8 @@ export async function list(req: Request, res: Response, next: NextFunction) {
         { employeeCode: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (department) where.department = department;
+    // Only allow department filter override for non-managers (managers are restricted to their own department)
+    if (department && req.user?.role !== 'MANAGER') where.department = department;
     if (role) where.role = role;
     if (isActive !== undefined) where.isActive = isActive === 'true';
 
@@ -140,6 +141,13 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function update(req: Request, res: Response, next: NextFunction) {
   try {
+    const existing = await prisma.employee.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+    });
+    if (!existing) {
+      return error(res, 'Employee not found', 404);
+    }
+
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
       data: req.body,

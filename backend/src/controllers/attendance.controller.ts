@@ -28,7 +28,7 @@ export async function timeIn(req: Request, res: Response, next: NextFunction) {
     let status: 'PRESENT' | 'LATE' = 'PRESENT';
     const totalMinutes = hour * 60 + minutes;
     const lateThreshold = config.officeHours.start * 60 + config.officeHours.lateThresholdMinutes;
-    if (totalMinutes > lateThreshold) {
+    if (totalMinutes >= lateThreshold) {
       status = 'LATE';
     }
 
@@ -130,11 +130,15 @@ export async function listAttendance(req: Request, res: Response, next: NextFunc
       if (manager?.department) {
         where.employee = { department: manager.department, deletedAt: null };
       }
+      // Managers can filter within their department
+      if (employeeId) where.employeeId = employeeId;
     } else if (req.user?.role === 'EMPLOYEE') {
+      // Employees can only see their own records
       where.employeeId = req.user.id;
+    } else {
+      // Admin can filter by any employee
+      if (employeeId) where.employeeId = employeeId;
     }
-
-    if (employeeId) where.employeeId = employeeId;
     if (status) where.status = status;
     if (startDate || endDate) {
       where.date = {};

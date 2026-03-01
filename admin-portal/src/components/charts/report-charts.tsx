@@ -38,7 +38,7 @@ export function StatusPieChart({ data }: StatusBreakdownProps) {
           paddingAngle={2}
           dataKey="count"
           nameKey="status"
-          label={({ status, count }) => `${status}: ${count}`}
+          label={({ status, count }) => `${String(status).replace(/_/g, ' ')}: ${count}`}
         >
           {data.map((entry) => (
             <Cell key={entry.status} fill={STATUS_COLORS[entry.status] || '#6b7280'} />
@@ -57,6 +57,7 @@ interface DepartmentChartProps {
     present: number;
     late: number;
     absent: number;
+    halfDay: number;
   }>;
 }
 
@@ -72,6 +73,7 @@ export function DepartmentBarChart({ data }: DepartmentChartProps) {
         <Bar dataKey="present" fill="#22c55e" name="Present" radius={[2, 2, 0, 0]} />
         <Bar dataKey="late" fill="#eab308" name="Late" radius={[2, 2, 0, 0]} />
         <Bar dataKey="absent" fill="#ef4444" name="Absent" radius={[2, 2, 0, 0]} />
+        <Bar dataKey="halfDay" fill="#f97316" name="Half Day" radius={[2, 2, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

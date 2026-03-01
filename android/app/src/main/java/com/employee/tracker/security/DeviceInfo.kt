@@ -14,7 +14,7 @@ class DeviceInfo @Inject constructor(
 ) {
     @SuppressLint("HardwareIds")
     fun getDeviceId(): String {
-        return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown"
     }
 
     fun getDeviceModel(): String {

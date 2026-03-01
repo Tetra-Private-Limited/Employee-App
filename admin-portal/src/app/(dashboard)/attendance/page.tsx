@@ -117,7 +117,7 @@ export default function AttendancePage() {
                       <TableCell>{formatTime(rec.timeOut)}</TableCell>
                       <TableCell>{formatDuration(duration)}</TableCell>
                       <TableCell>
-                        <Badge variant={rec.status}>{rec.status.replace('_', ' ')}</Badge>
+                        <Badge variant={rec.status}>{rec.status.replace(/_/g, ' ')}</Badge>
                       </TableCell>
                     </TableRow>
                   );

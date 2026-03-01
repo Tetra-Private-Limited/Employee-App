@@ -34,7 +34,7 @@ class LoginActivity : AppCompatActivity() {
     private fun setupUI() {
         binding.btnLogin.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
-            val password = binding.etPassword.text.toString().trim()
+            val password = binding.etPassword.text.toString()
 
             if (email.isEmpty()) {
                 binding.tilEmail.error = "Email is required"

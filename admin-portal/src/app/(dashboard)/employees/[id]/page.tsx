@@ -22,22 +22,34 @@ export default function EmployeeDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
 
   const handleUpdate = async (data: unknown) => {
-    await api.put(`/employees/${id}`, data);
-    setShowEditModal(false);
-    refresh();
+    try {
+      await api.put(`/employees/${id}`, data);
+      setShowEditModal(false);
+      refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update employee');
+    }
   };
 
   const handleResetDevice = async () => {
     if (confirm('Reset device binding for this employee?')) {
-      await api.post('/auth/reset-device', { employeeId: id });
-      refresh();
+      try {
+        await api.post('/auth/reset-device', { employeeId: id });
+        refresh();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to reset device');
+      }
     }
   };
 
   const handleDelete = async () => {
     if (confirm('Delete this employee? This action cannot be undone.')) {
-      await api.del(`/employees/${id}`);
-      router.push('/employees');
+      try {
+        await api.del(`/employees/${id}`);
+        router.push('/employees');
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to delete employee');
+      }
     }
   };
 

@@ -70,6 +70,13 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function update(req: Request, res: Response, next: NextFunction) {
   try {
+    const existing = await prisma.geofence.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+    });
+    if (!existing) {
+      return error(res, 'Geofence not found', 404);
+    }
+
     const geofence = await prisma.geofence.update({
       where: { id: req.params.id },
       data: req.body,

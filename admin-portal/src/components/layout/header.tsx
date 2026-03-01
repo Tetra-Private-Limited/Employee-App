@@ -1,7 +1,5 @@
 'use client';
 
-import { useAuth } from '@/components/providers/auth-provider';
-
 interface HeaderProps {
   title: string;
   description?: string;

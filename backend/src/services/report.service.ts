@@ -116,7 +116,7 @@ export async function getFieldMovementSummary(
   const activeMinutes = Math.round((lastTime.getTime() - firstTime.getTime()) / 60000);
 
   return {
-    totalDistanceKm: Math.round(totalDistanceMeters / 10) / 100,
+    totalDistanceKm: Math.round((totalDistanceMeters / 1000) * 100) / 100,
     activeMinutes,
     stops,
     locationCount: locations.length,

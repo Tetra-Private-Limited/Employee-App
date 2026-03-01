@@ -40,6 +40,7 @@ class TokenManager @Inject constructor(
         prefs.edit()
             .remove(KEY_ACCESS_TOKEN)
             .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_EMPLOYEE_ID)
             .apply()
     }
 

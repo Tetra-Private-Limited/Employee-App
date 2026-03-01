@@ -22,7 +22,7 @@ const router = Router();
 
 // ─── Auth Routes ─────────────────────────────────────────
 router.post('/auth/login', validate(loginSchema), authCtrl.login);
-router.post('/auth/register', validate(registerSchema), authCtrl.register);
+router.post('/auth/register', authenticate, authorize('ADMIN'), validate(registerSchema), authCtrl.register);
 router.post('/auth/refresh', validate(refreshTokenSchema), authCtrl.refreshToken);
 router.get('/auth/me', authenticate, authCtrl.me);
 router.post('/auth/change-password', authenticate, validate(changePasswordSchema), authCtrl.changePassword);
@@ -53,7 +53,7 @@ router.post('/geofences', authenticate, authorize('ADMIN'), validate(createGeofe
 router.put('/geofences/:id', authenticate, authorize('ADMIN'), validate(updateGeofenceSchema), geofenceCtrl.update);
 router.delete('/geofences/:id', authenticate, authorize('ADMIN'), geofenceCtrl.softDelete);
 router.post('/geofences/:id/assign', authenticate, authorize('ADMIN'), validate(assignGeofenceSchema), geofenceCtrl.assignEmployees);
-router.get('/geofences/:id/check', authenticate, geofenceCtrl.checkLocation);
+router.get('/geofences/:id/check', authenticate, validateQuery(checkGeofenceSchema), geofenceCtrl.checkLocation);
 
 // ─── Report Routes ───────────────────────────────────────
 router.get('/reports/dashboard', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getDashboardStats);

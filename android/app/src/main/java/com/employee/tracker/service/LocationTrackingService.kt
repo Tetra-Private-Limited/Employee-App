@@ -10,6 +10,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.os.Build
 import android.os.BatteryManager
 import android.os.IBinder
 import android.os.Looper
@@ -93,6 +94,8 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
             .build()
 
         try {
+            // Remove previous callback before registering a new one
+            fusedLocationClient.removeLocationUpdates(locationCallback)
             fusedLocationClient.requestLocationUpdates(
                 request, locationCallback, Looper.getMainLooper()
             )
@@ -112,7 +115,7 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
                 speed = location.speed,
                 bearing = location.bearing,
                 provider = location.provider,
-                isMock = location.isFromMockProvider,
+                isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) location.isMock else location.isFromMockProvider,
                 batteryLevel = getBatteryLevel(),
                 deviceId = deviceInfo.getDeviceId(),
                 satelliteCount = location.extras?.getInt("satellites"),
