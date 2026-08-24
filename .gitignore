@@ -60,3 +60,6 @@ Thumbs.db
 # Database
 *.db
 *.sqlite
+
+.vercel
+.env*
