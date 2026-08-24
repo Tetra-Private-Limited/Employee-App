@@ -17,6 +17,7 @@ import { Employee, CreateEmployeeForm, UpdateEmployeeForm } from '@/lib/types';
 const roleFilterOptions = [
   { value: 'EMPLOYEE', label: 'Employee' },
   { value: 'MANAGER', label: 'Manager' },
+  { value: 'HR', label: 'HR' },
   { value: 'ADMIN', label: 'Admin' },
 ];
 

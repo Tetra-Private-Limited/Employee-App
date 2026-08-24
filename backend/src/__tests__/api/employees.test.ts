@@ -73,8 +73,7 @@ describe('Employees API', () => {
       expect(res.status).toBe(403);
     });
 
-    it('returns 200 for MANAGER role', async () => {
-      mockPrisma.employee.findUnique.mockResolvedValue({ department: 'Eng' });
+    it('returns 200 for MANAGER role, scoped to their direct reports', async () => {
       mockPrisma.employee.findMany.mockResolvedValue([]);
       mockPrisma.employee.count.mockResolvedValue(0);
 
@@ -83,6 +82,43 @@ describe('Employees API', () => {
         .set('Authorization', `Bearer ${makeToken('MANAGER')}`);
 
       expect(res.status).toBe(200);
+      expect(mockPrisma.employee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ managerId: 'u1' }),
+        })
+      );
+    });
+
+    it('does not let a MANAGER widen scope via a department query param', async () => {
+      mockPrisma.employee.findMany.mockResolvedValue([]);
+      mockPrisma.employee.count.mockResolvedValue(0);
+
+      const res = await request(app)
+        .get('/employees?department=Sales')
+        .set('Authorization', `Bearer ${makeToken('MANAGER')}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.employee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ managerId: 'u1', department: 'Sales' }),
+        })
+      );
+    });
+
+    it('returns 200 for HR role with unrestricted visibility', async () => {
+      mockPrisma.employee.findMany.mockResolvedValue([]);
+      mockPrisma.employee.count.mockResolvedValue(0);
+
+      const res = await request(app)
+        .get('/employees')
+        .set('Authorization', `Bearer ${makeToken('HR')}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.employee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.not.objectContaining({ managerId: expect.anything() }),
+        })
+      );
     });
   });
 
@@ -109,6 +145,47 @@ describe('Employees API', () => {
       const res = await request(app)
         .get('/employees/nonexistent')
         .set('Authorization', `Bearer ${makeToken('ADMIN')}`);
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 403 for EMPLOYEE role', async () => {
+      const res = await request(app)
+        .get('/employees/1')
+        .set('Authorization', `Bearer ${makeToken('EMPLOYEE')}`);
+
+      expect(res.status).toBe(403);
+      expect(mockPrisma.employee.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('scopes a MANAGER lookup to their own direct reports', async () => {
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: '1',
+        name: 'Alice',
+        managerId: 'u1',
+        _count: { attendance: 0, locationRecords: 0, spoofingAlerts: 0 },
+      });
+
+      const res = await request(app)
+        .get('/employees/1')
+        .set('Authorization', `Bearer ${makeToken('MANAGER')}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.employee.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: '1', managerId: 'u1' }),
+        })
+      );
+    });
+
+    it('returns 404 (not 403) when a MANAGER requests an employee outside their team', async () => {
+      // The query itself is scoped to managerId, so it comes back empty
+      // rather than leaking whether the employee exists elsewhere.
+      mockPrisma.employee.findFirst.mockResolvedValue(null);
+
+      const res = await request(app)
+        .get('/employees/other-managers-report')
+        .set('Authorization', `Bearer ${makeToken('MANAGER')}`);
 
       expect(res.status).toBe(404);
     });

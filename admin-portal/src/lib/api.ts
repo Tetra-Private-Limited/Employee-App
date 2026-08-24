@@ -142,6 +142,21 @@ class ApiClient {
     this.setTokens(json.data.accessToken, json.data.refreshToken);
     return json.data;
   }
+
+  // Invalidates the refresh token server-side so logout actually ends the
+  // session, instead of just discarding tokens client-side while the
+  // refresh token stays valid for its full lifetime. Local tokens are
+  // always cleared, even if the request fails (e.g. already expired,
+  // offline) — logout must never get the user stuck.
+  async logout(): Promise<void> {
+    try {
+      await this.post('/auth/logout');
+    } catch {
+      // Best-effort — local logout proceeds regardless.
+    } finally {
+      this.clearTokens();
+    }
+  }
 }
 
 export const api = new ApiClient(API_URL);

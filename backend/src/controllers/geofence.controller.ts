@@ -22,10 +22,15 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
+    // Geofences themselves are shared org infrastructure and visible to any
+    // ADMIN/HR/MANAGER, but the list of employees assigned to one must still
+    // respect manager scoping so it can't be used to see another manager's
+    // team members.
     const geofence = await prisma.geofence.findFirst({
       where: { id: req.params.id, deletedAt: null },
       include: {
         employeeGeofences: {
+          where: req.user?.role === 'MANAGER' ? { employee: { managerId: req.user.id } } : undefined,
           include: {
             employee: {
               select: { id: true, name: true, employeeCode: true },
@@ -136,6 +141,27 @@ export async function assignEmployees(req: Request, res: Response, next: NextFun
     }
 
     return success(res, { message: `Assigned ${employeeIds.length} employees to geofence` });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getMyGeofences(req: Request, res: Response, next: NextFunction) {
+  try {
+    const employeeId = req.user!.id;
+
+    const employeeGeofences = await prisma.employeeGeofence.findMany({
+      where: { employeeId, geofence: { deletedAt: null, isActive: true } },
+      include: { geofence: true },
+    });
+
+    const geofences = employeeGeofences.map((eg) => ({
+      ...eg.geofence,
+      latitude: Number(eg.geofence.latitude),
+      longitude: Number(eg.geofence.longitude),
+    }));
+
+    return success(res, geofences);
   } catch (err) {
     next(err);
   }

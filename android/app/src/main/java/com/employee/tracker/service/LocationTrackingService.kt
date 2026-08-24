@@ -25,6 +25,8 @@ import com.employee.tracker.security.DeviceInfo
 import com.employee.tracker.ui.dashboard.DashboardActivity
 import com.google.android.gms.location.*
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
@@ -38,6 +40,12 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var sensorManager: SensorManager
     private var lastAccelerometer = floatArrayOf(0f, 0f, 0f)
+
+    // Which interval is currently registered with the location provider, so
+    // the periodic check below only re-registers when it actually needs to
+    // change, not every time it runs.
+    private var activeIntervalMs: Long? = null
+    private var intervalMonitorJob: Job? = null
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -80,12 +88,36 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        intervalMonitorJob?.cancel()
         fusedLocationClient.removeLocationUpdates(locationCallback)
         sensorManager.unregisterListener(this)
     }
 
+    // Registers location updates at the interval appropriate for right now,
+    // then keeps checking periodically so the interval actually changes when
+    // the clock crosses the work/off-hours boundary. Previously this was
+    // computed once when the service started and never revisited — a
+    // service started at 7am (before work hours) stayed on the slow
+    // off-hours interval all day, and one started during work hours kept
+    // polling every few minutes all night if the employee stayed logged in.
     private fun startLocationUpdates() {
-        val interval = if (isWorkingHours()) WORK_INTERVAL_MS else OFF_HOURS_INTERVAL_MS
+        applyLocationInterval(desiredIntervalMs())
+
+        intervalMonitorJob?.cancel()
+        intervalMonitorJob = lifecycleScope.launch {
+            while (true) {
+                delay(INTERVAL_CHECK_PERIOD_MS)
+                applyLocationInterval(desiredIntervalMs())
+            }
+        }
+    }
+
+    private fun desiredIntervalMs(): Long =
+        if (isWorkingHours()) WORK_INTERVAL_MS else OFF_HOURS_INTERVAL_MS
+
+    private fun applyLocationInterval(interval: Long) {
+        if (activeIntervalMs == interval) return
+        activeIntervalMs = interval
 
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
             .setMinUpdateIntervalMillis(interval / 2)
@@ -93,6 +125,7 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
             .build()
 
         try {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
             fusedLocationClient.requestLocationUpdates(
                 request, locationCallback, Looper.getMainLooper()
             )
@@ -173,8 +206,9 @@ class LocationTrackingService : LifecycleService(), SensorEventListener {
         private const val TAG = "LocationService"
         const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "STOP_TRACKING"
-        private const val WORK_INTERVAL_MS = 30_000L       // 30 seconds
+        private const val WORK_INTERVAL_MS = 600_000L        // 10 minutes
         private const val OFF_HOURS_INTERVAL_MS = 3_600_000L // 60 minutes
+        private const val INTERVAL_CHECK_PERIOD_MS = 300_000L // re-check every 5 minutes
         private const val WORK_START_HOUR = 8
         private const val WORK_END_HOUR = 20
 

@@ -203,6 +203,29 @@ export async function me(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function logout(req: Request, res: Response, next: NextFunction) {
+  try {
+    // Invalidate the refresh token server-side so a logout actually ends
+    // the session, rather than just discarding the tokens client-side while
+    // the refresh token remains valid for its full lifetime.
+    await prisma.employee.update({
+      where: { id: req.user!.id },
+      data: { refreshTokenHash: null },
+    });
+
+    await auditService.createAuditLog({
+      userId: req.user!.id,
+      action: 'LOGOUT',
+      ipAddress: auditService.getClientIp(req),
+      userAgent: req.headers['user-agent'],
+    });
+
+    return success(res, { message: 'Logged out successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function changePassword(req: Request, res: Response, next: NextFunction) {
   try {
     const { oldPassword, newPassword } = req.body;

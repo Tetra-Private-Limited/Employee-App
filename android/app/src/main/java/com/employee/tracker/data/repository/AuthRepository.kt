@@ -63,8 +63,19 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    fun logout() {
-        tokenManager.clearAll()
+    // Invalidates the refresh token server-side so logout actually ends the
+    // session (previously this only cleared local storage, leaving the
+    // refresh token valid server-side for its full lifetime). Local state
+    // is always cleared, even if the request fails (e.g. offline) — logout
+    // must never leave the user stuck signed in on the device.
+    suspend fun logout() {
+        try {
+            api.logout()
+        } catch (e: Exception) {
+            // Best-effort — local logout proceeds regardless.
+        } finally {
+            tokenManager.clearAll()
+        }
     }
 
     fun isLoggedIn(): Boolean = tokenManager.isLoggedIn()

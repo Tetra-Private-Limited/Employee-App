@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.employee.tracker.data.repository.LocationRepository
-import com.employee.tracker.util.Result
+import com.employee.tracker.util.Result as AppResult
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -19,11 +19,11 @@ class LocationSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return when (val result = locationRepository.syncPendingLocations()) {
-            is com.employee.tracker.util.Result.Success -> {
+            is AppResult.Success -> {
                 Log.d(TAG, "Synced ${result.data} locations")
                 Result.success()
             }
-            is com.employee.tracker.util.Result.Error -> {
+            is AppResult.Error -> {
                 Log.e(TAG, "Sync failed: ${result.message}")
                 Result.retry()
             }

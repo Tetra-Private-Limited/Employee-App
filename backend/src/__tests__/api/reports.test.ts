@@ -84,6 +84,48 @@ describe('Reports API', () => {
 
       expect(res.status).toBe(403);
     });
+
+    it('scopes stats to a MANAGER\'s direct reports rather than company-wide', async () => {
+      const managerToken = jwt.sign(
+        { id: 'mgr-1', email: 'mgr@test.com', role: 'MANAGER' },
+        config.jwt.accessSecret,
+        { expiresIn: '1h' }
+      );
+
+      const res = await request(app)
+        .get('/reports/dashboard')
+        .set('Authorization', `Bearer ${managerToken}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.employee.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ managerId: 'mgr-1' }) })
+      );
+      // presentToday counts distinct employees (not attendance rows, since
+      // one employee can have multiple sessions in a day), via findMany.
+      expect(mockPrisma.attendance.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ employee: { managerId: 'mgr-1' } }),
+          distinct: ['employeeId'],
+        })
+      );
+    });
+
+    it('returns 200 for HR role with company-wide (unscoped) stats', async () => {
+      const hrToken = jwt.sign(
+        { id: 'hr-1', email: 'hr@test.com', role: 'HR' },
+        config.jwt.accessSecret,
+        { expiresIn: '1h' }
+      );
+
+      const res = await request(app)
+        .get('/reports/dashboard')
+        .set('Authorization', `Bearer ${hrToken}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.employee.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.not.objectContaining({ managerId: expect.anything() }) })
+      );
+    });
   });
 
   describe('GET /reports/alerts/recent', () => {

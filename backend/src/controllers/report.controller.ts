@@ -3,9 +3,13 @@ import { success, error } from '../utils/apiResponse.js';
 import * as reportService from '../services/report.service.js';
 import { prisma } from '../config/prisma.js';
 
+function managerScopeId(req: Request): string | undefined {
+  return req.user?.role === 'MANAGER' ? req.user.id : undefined;
+}
+
 export async function getDashboardStats(req: Request, res: Response, next: NextFunction) {
   try {
-    const stats = await reportService.getDashboardStats();
+    const stats = await reportService.getDashboardStats(managerScopeId(req));
     return success(res, stats);
   } catch (err) {
     next(err);
@@ -23,7 +27,8 @@ export async function getAttendanceReport(req: Request, res: Response, next: Nex
     const report = await reportService.getAttendanceReport(
       new Date(startDate),
       new Date(endDate),
-      department || undefined
+      department || undefined,
+      managerScopeId(req)
     );
 
     return success(res, report);
@@ -39,7 +44,7 @@ export async function exportAttendanceCsv(req: Request, res: Response, next: Nex
     const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
     const end = endDate ? new Date(endDate) : new Date();
 
-    const csvData = await reportService.generateCsvData(start, end, department || undefined);
+    const csvData = await reportService.generateCsvData(start, end, department || undefined, managerScopeId(req));
 
     // Convert to CSV string
     if (csvData.length === 0) {
@@ -63,7 +68,14 @@ export async function exportAttendanceCsv(req: Request, res: Response, next: Nex
 
 export async function getRecentAlerts(req: Request, res: Response, next: NextFunction) {
   try {
+    const where: any = {};
+    const managerId = managerScopeId(req);
+    if (managerId) {
+      where.employee = { managerId };
+    }
+
     const alerts = await prisma.spoofingAlert.findMany({
+      where,
       take: 20,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -88,7 +100,18 @@ export async function getFieldMovement(req: Request, res: Response, next: NextFu
       return error(res, 'date query parameter is required', 400);
     }
 
-    const summary = await reportService.getFieldMovementSummary(employeeId, new Date(date));
+    const managerId = managerScopeId(req);
+    if (managerId) {
+      const isDirectReport = await prisma.employee.findFirst({
+        where: { id: employeeId, managerId },
+        select: { id: true },
+      });
+      if (!isDirectReport) {
+        return error(res, 'Employee not found in your team', 403);
+      }
+    }
+
+    const summary = await reportService.getFieldMovementSummary(employeeId, date);
     return success(res, summary);
   } catch (err) {
     next(err);

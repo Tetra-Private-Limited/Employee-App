@@ -1,34 +1,45 @@
 import { prisma } from '../config/prisma.js';
 import { calculateRouteDistance, detectStops } from './location.service.js';
+import { startOfOrgDay, orgDayBoundsFromDateString } from '../utils/time.js';
 
-export async function getDashboardStats() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+export async function getDashboardStats(managerId?: string) {
+  const today = startOfOrgDay();
+
+  const employeeScope = managerId ? { managerId } : {};
+  const employeeRelationScope = managerId ? { employee: { managerId } } : {};
 
   const [
     totalEmployees,
     activeEmployees,
-    presentToday,
+    presentTodayEmployees,
     alertsToday,
     recentLocations,
   ] = await Promise.all([
-    prisma.employee.count({ where: { deletedAt: null } }),
-    prisma.employee.count({ where: { isActive: true, deletedAt: null } }),
-    prisma.attendance.count({
+    prisma.employee.count({ where: { deletedAt: null, ...employeeScope } }),
+    prisma.employee.count({ where: { isActive: true, deletedAt: null, ...employeeScope } }),
+    // An employee can have multiple attendance rows today (multiple
+    // clock-in/out sessions), so this counts distinct employees, not rows —
+    // otherwise someone with two sessions would be counted twice.
+    prisma.attendance.findMany({
       where: {
         date: today,
         timeIn: { not: null },
+        ...employeeRelationScope,
       },
+      distinct: ['employeeId'],
+      select: { employeeId: true },
     }),
     prisma.spoofingAlert.count({
       where: {
         createdAt: { gte: today },
         severity: { in: ['HIGH', 'CRITICAL'] },
+        ...employeeRelationScope,
       },
     }),
     prisma.locationRecord.findMany({
       where: {
         recordedAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+        ...employeeRelationScope,
       },
       distinct: ['employeeId'],
       select: { employeeId: true },
@@ -38,7 +49,7 @@ export async function getDashboardStats() {
   return {
     totalEmployees,
     activeEmployees,
-    presentToday,
+    presentToday: presentTodayEmployees.length,
     inField: recentLocations.length,
     alertsToday,
   };
@@ -47,7 +58,8 @@ export async function getDashboardStats() {
 export async function getAttendanceReport(
   startDate: Date,
   endDate: Date,
-  department?: string
+  department?: string,
+  managerId?: string
 ) {
   const where: any = {
     date: { gte: startDate, lte: endDate },
@@ -55,6 +67,9 @@ export async function getAttendanceReport(
   };
   if (department) {
     where.employee = { ...where.employee, department };
+  }
+  if (managerId) {
+    where.employee = { ...where.employee, managerId };
   }
 
   const records = await prisma.attendance.findMany({
@@ -83,17 +98,17 @@ export async function getAttendanceReport(
 
 export async function getFieldMovementSummary(
   employeeId: string,
-  date: Date
+  dateString: string
 ) {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  // dateString is a plain "YYYY-MM-DD" calendar date (as sent by the admin
+  // portal's date picker) representing an org-local day, not a UTC instant —
+  // resolve its bounds in the org's timezone rather than the server host's.
+  const { start, end } = orgDayBoundsFromDateString(dateString);
 
   const locations = await prisma.locationRecord.findMany({
     where: {
       employeeId,
-      recordedAt: { gte: startOfDay, lte: endOfDay },
+      recordedAt: { gte: start, lt: end },
     },
     orderBy: { recordedAt: 'asc' },
   });
@@ -128,9 +143,10 @@ export async function getFieldMovementSummary(
 export async function generateCsvData(
   startDate: Date,
   endDate: Date,
-  department?: string
+  department?: string,
+  managerId?: string
 ) {
-  const report = await getAttendanceReport(startDate, endDate, department);
+  const report = await getAttendanceReport(startDate, endDate, department, managerId);
   return report.map((r) => ({
     'Employee Name': r.employeeName,
     'Employee Code': r.employeeCode,

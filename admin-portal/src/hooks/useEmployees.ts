@@ -82,6 +82,33 @@ export function useEmployees(initialFilters: EmployeeFilters = {}) {
   };
 }
 
+// Lightweight list of employees eligible to be someone's manager, for the
+// manager-assignment dropdown on the employee form.
+export function useManagerOptions() {
+  const [managers, setManagers] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const qs = buildQueryString({ role: 'MANAGER', limit: 100 });
+        const res = await api.get<PaginatedResponse<Employee>>(`/employees${qs}`);
+        if (!cancelled) setManagers(res.data);
+      } catch {
+        if (!cancelled) setManagers([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { managers, loading };
+}
+
 export function useEmployee(id: string) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);

@@ -5,6 +5,13 @@ export const GEOFENCE_DEFAULT_RADIUS = 100;
 export const IMPOSSIBLE_TRAVEL_SPEED_KMH = 200;
 export const EARTH_RADIUS_KM = 6371;
 
+// How far back the "recent locations" tracking view looks for each
+// employee's last known position. The device keeps reporting in the
+// background after clock-out (only logout stops it), so this window is
+// what actually determines how long a clocked-out employee stays visible
+// on the map, not the tracking service itself.
+export const RECENT_LOCATION_WINDOW_HOURS = 24;
+
 // Risk score weights
 export const RISK_WEIGHTS = {
   MOCK_PROVIDER: 40,

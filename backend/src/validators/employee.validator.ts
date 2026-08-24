@@ -8,7 +8,8 @@ export const createEmployeeSchema = z.object({
   department: z.string().optional(),
   designation: z.string().optional(),
   employeeCode: z.string().min(1),
-  role: z.enum(['EMPLOYEE', 'MANAGER', 'ADMIN']).optional(),
+  role: z.enum(['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']).optional(),
+  managerId: z.string().uuid().nullable().optional(),
 });
 
 export const updateEmployeeSchema = z.object({
@@ -17,7 +18,8 @@ export const updateEmployeeSchema = z.object({
   phone: z.string().optional(),
   department: z.string().optional(),
   designation: z.string().optional(),
-  role: z.enum(['EMPLOYEE', 'MANAGER', 'ADMIN']).optional(),
+  role: z.enum(['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']).optional(),
+  managerId: z.string().uuid().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -30,6 +32,6 @@ export const employeeQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
   search: z.string().optional(),
   department: z.string().optional(),
-  role: z.enum(['EMPLOYEE', 'MANAGER', 'ADMIN']).optional(),
+  role: z.enum(['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']).optional(),
   isActive: z.coerce.boolean().optional(),
 });

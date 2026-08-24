@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/authorize.js';
 import { validate, validateQuery } from '../middleware/validate.js';
+import { loginLimiter } from '../middleware/rateLimiter.js';
+import { verifyDeviceBinding } from '../middleware/deviceBinding.js';
 
 // Validators
 import { loginSchema, registerSchema, changePasswordSchema, refreshTokenSchema } from '../validators/auth.validator.js';
@@ -21,34 +23,36 @@ import * as reportCtrl from '../controllers/report.controller.js';
 const router = Router();
 
 // ─── Auth Routes ─────────────────────────────────────────
-router.post('/auth/login', validate(loginSchema), authCtrl.login);
-router.post('/auth/register', validate(registerSchema), authCtrl.register);
+router.post('/auth/login', loginLimiter, validate(loginSchema), authCtrl.login);
+router.post('/auth/register', authenticate, authorize('ADMIN'), validate(registerSchema), authCtrl.register);
 router.post('/auth/refresh', validate(refreshTokenSchema), authCtrl.refreshToken);
 router.get('/auth/me', authenticate, authCtrl.me);
+router.post('/auth/logout', authenticate, authCtrl.logout);
 router.post('/auth/change-password', authenticate, validate(changePasswordSchema), authCtrl.changePassword);
 router.post('/auth/reset-device', authenticate, authorize('ADMIN'), validate(resetDeviceSchema), authCtrl.resetDevice);
 
 // ─── Employee Routes ─────────────────────────────────────
-router.get('/employees', authenticate, authorize('ADMIN', 'MANAGER'), employeeCtrl.list);
-router.get('/employees/:id', authenticate, employeeCtrl.getById);
+router.get('/employees', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), employeeCtrl.list);
+router.get('/employees/:id', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), employeeCtrl.getById);
 router.post('/employees', authenticate, authorize('ADMIN'), validate(createEmployeeSchema), employeeCtrl.create);
 router.put('/employees/:id', authenticate, authorize('ADMIN'), validate(updateEmployeeSchema), employeeCtrl.update);
 router.delete('/employees/:id', authenticate, authorize('ADMIN'), employeeCtrl.softDelete);
 
 // ─── Attendance Routes ───────────────────────────────────
-router.post('/attendance/time-in', authenticate, validate(timeInSchema), attendanceCtrl.timeIn);
+router.post('/attendance/time-in', authenticate, validate(timeInSchema), verifyDeviceBinding, attendanceCtrl.timeIn);
 router.post('/attendance/time-out', authenticate, validate(timeOutSchema), attendanceCtrl.timeOut);
 router.get('/attendance/today', authenticate, attendanceCtrl.getToday);
 router.get('/attendance', authenticate, attendanceCtrl.listAttendance);
 
 // ─── Location Routes ─────────────────────────────────────
-router.post('/locations/batch', authenticate, validate(locationBatchSchema), locationCtrl.batchUpload);
-router.get('/locations/recent', authenticate, authorize('ADMIN', 'MANAGER'), locationCtrl.getRecentLocations);
-router.get('/locations/route', authenticate, authorize('ADMIN', 'MANAGER'), locationCtrl.getEmployeeRoute);
+router.post('/locations/batch', authenticate, validate(locationBatchSchema), verifyDeviceBinding, locationCtrl.batchUpload);
+router.get('/locations/recent', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), locationCtrl.getRecentLocations);
+router.get('/locations/route', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), locationCtrl.getEmployeeRoute);
 
 // ─── Geofence Routes ─────────────────────────────────────
-router.get('/geofences', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.list);
-router.get('/geofences/:id', authenticate, authorize('ADMIN', 'MANAGER'), geofenceCtrl.getById);
+router.get('/geofences', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), geofenceCtrl.list);
+router.get('/geofences/my', authenticate, geofenceCtrl.getMyGeofences);
+router.get('/geofences/:id', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), geofenceCtrl.getById);
 router.post('/geofences', authenticate, authorize('ADMIN'), validate(createGeofenceSchema), geofenceCtrl.create);
 router.put('/geofences/:id', authenticate, authorize('ADMIN'), validate(updateGeofenceSchema), geofenceCtrl.update);
 router.delete('/geofences/:id', authenticate, authorize('ADMIN'), geofenceCtrl.softDelete);
@@ -56,10 +60,10 @@ router.post('/geofences/:id/assign', authenticate, authorize('ADMIN'), validate(
 router.get('/geofences/:id/check', authenticate, geofenceCtrl.checkLocation);
 
 // ─── Report Routes ───────────────────────────────────────
-router.get('/reports/dashboard', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getDashboardStats);
-router.get('/reports/attendance', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getAttendanceReport);
-router.get('/reports/attendance/export', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.exportAttendanceCsv);
-router.get('/reports/alerts/recent', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getRecentAlerts);
-router.get('/reports/movement/:employeeId', authenticate, authorize('ADMIN', 'MANAGER'), reportCtrl.getFieldMovement);
+router.get('/reports/dashboard', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), reportCtrl.getDashboardStats);
+router.get('/reports/attendance', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), reportCtrl.getAttendanceReport);
+router.get('/reports/attendance/export', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), reportCtrl.exportAttendanceCsv);
+router.get('/reports/alerts/recent', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), reportCtrl.getRecentAlerts);
+router.get('/reports/movement/:employeeId', authenticate, authorize('ADMIN', 'HR', 'MANAGER'), reportCtrl.getFieldMovement);
 
 export default router;

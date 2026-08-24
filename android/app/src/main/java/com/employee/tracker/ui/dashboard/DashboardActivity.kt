@@ -188,7 +188,10 @@ class DashboardActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 binding.tvClockOutTime.text = "Out: ${attendance.timeOut}"
             }
-            binding.btnClockIn.visibility = View.GONE
+            // Already clocked out of this session — but the employee can be
+            // called back for another session today (e.g. emergency duty),
+            // so Clock In stays available rather than dead-ending for the day.
+            binding.btnClockIn.visibility = View.VISIBLE
             binding.btnClockOut.visibility = View.GONE
         } else {
             binding.tvClockOutTime.text = "--"

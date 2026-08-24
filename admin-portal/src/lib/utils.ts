@@ -2,6 +2,18 @@ export function cn(...classes: (string | boolean | undefined | null)[]): string 
   return classes.filter(Boolean).join(' ');
 }
 
+// Escapes text before it's interpolated into an HTML string (e.g. a Leaflet
+// popup built from a template literal), preventing stored XSS via fields
+// like employee name that ultimately come from user-editable data.
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-IN', {
     year: 'numeric',
@@ -16,6 +28,21 @@ export function formatTime(dateString: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// Relative "how long ago" for a location ping. The tracking view shows an
+// employee's last known position for up to 24h (they keep reporting after
+// clock-out, and stay visible until logout), so an absolute clock time
+// alone doesn't tell an admin whether a marker is live or a day old.
+export function timeAgo(dateString: string): string {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export function formatDateTime(dateString: string): string {
@@ -44,6 +71,7 @@ export function getStatusColor(status: string): string {
     HALF_DAY: 'bg-orange-100 text-orange-800',
     EMPLOYEE: 'bg-blue-100 text-blue-800',
     MANAGER: 'bg-purple-100 text-purple-800',
+    HR: 'bg-teal-100 text-teal-800',
     ADMIN: 'bg-red-100 text-red-800',
     LOW: 'bg-gray-100 text-gray-800',
     MEDIUM: 'bg-yellow-100 text-yellow-800',

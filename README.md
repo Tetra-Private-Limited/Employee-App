@@ -48,6 +48,7 @@ Employee tracking system with a backend API, admin portal, and Android mobile ap
    | `PORT` | Server port | `3001` |
    | `CORS_ORIGIN` | Allowed CORS origin | `http://localhost:3000` |
    | `NODE_ENV` | Environment | `development` |
+   | `ORG_TIMEZONE` | IANA timezone (e.g. `Asia/Dhaka`) used for attendance day boundaries and the late-arrival cutoff | `UTC` |
 
 4. Set up the database:
 

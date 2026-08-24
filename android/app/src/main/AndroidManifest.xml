@@ -40,6 +40,14 @@
             android:name=".ui.dashboard.DashboardActivity"
             android:theme="@style/Theme.EmployeeTracker.NoActionBar" />
 
+        <activity
+            android:name=".ui.attendance.AttendanceHistoryActivity"
+            android:theme="@style/Theme.EmployeeTracker.NoActionBar" />
+
+        <activity
+            android:name=".ui.profile.ProfileActivity"
+            android:theme="@style/Theme.EmployeeTracker.NoActionBar" />
+
         <!-- Location Tracking Service -->
         <service
             android:name=".service.LocationTrackingService"

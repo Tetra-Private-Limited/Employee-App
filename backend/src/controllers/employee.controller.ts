@@ -11,12 +11,11 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 
     const where: any = { deletedAt: null };
 
-    // Role-based visibility: managers see only their department
+    // Role-based visibility: managers see only their assigned direct reports.
+    // This restriction lives on a different key (managerId) than the optional
+    // `department` filter below, so a query param can never override it.
     if (req.user?.role === 'MANAGER') {
-      const manager = await prisma.employee.findUnique({ where: { id: req.user.id } });
-      if (manager?.department) {
-        where.department = manager.department;
-      }
+      where.managerId = req.user.id;
     }
 
     if (search) {
@@ -45,6 +44,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
           designation: true,
           role: true,
           isActive: true,
+          managerId: true,
           registeredDeviceId: true,
           deviceModel: true,
           createdAt: true,
@@ -62,8 +62,16 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
+    const where: any = { id: req.params.id, deletedAt: null };
+
+    // Managers may only look up their own direct reports. A 404 (rather than
+    // 403) avoids revealing whether an employee outside their team exists.
+    if (req.user?.role === 'MANAGER') {
+      where.managerId = req.user.id;
+    }
+
     const employee = await prisma.employee.findFirst({
-      where: { id: req.params.id, deletedAt: null },
+      where,
       select: {
         id: true,
         employeeCode: true,
@@ -74,6 +82,7 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
         designation: true,
         role: true,
         isActive: true,
+        managerId: true,
         registeredDeviceId: true,
         deviceModel: true,
         deviceBoundAt: true,
@@ -101,7 +110,7 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, email, password, phone, department, designation, employeeCode, role } = req.body;
+    const { name, email, password, phone, department, designation, employeeCode, role, managerId } = req.body;
 
     const passwordHash = await authService.hashPassword(password);
 
@@ -115,6 +124,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
         designation,
         employeeCode,
         role: role || 'EMPLOYEE',
+        managerId: managerId || null,
       },
     });
 
@@ -140,6 +150,10 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function update(req: Request, res: Response, next: NextFunction) {
   try {
+    if (req.body.managerId && req.body.managerId === req.params.id) {
+      return error(res, 'An employee cannot be their own manager', 400);
+    }
+
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
       data: req.body,
@@ -152,6 +166,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
         department: true,
         designation: true,
         role: true,
+        managerId: true,
         isActive: true,
       },
     });

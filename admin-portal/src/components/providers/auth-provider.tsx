@@ -3,7 +3,12 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Employee } from '@/lib/types';
+import { Employee, Role } from '@/lib/types';
+
+// Roles allowed to sign into the admin portal. EMPLOYEE accounts use the
+// mobile app only; every role here maps to a backend role that also has
+// read access to the corresponding API endpoints.
+const PORTAL_ROLES: Role[] = ['ADMIN', 'HR', 'MANAGER'];
 
 interface AuthContextType {
   user: Employee | null;
@@ -31,8 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.get<{ success: boolean; data: Employee }>('/auth/me');
       const employee = response.data;
 
-      // Only allow ADMIN and MANAGER roles
-      if (employee.role !== 'ADMIN' && employee.role !== 'MANAGER') {
+      // Only allow roles with portal access
+      if (!PORTAL_ROLES.includes(employee.role)) {
         api.clearTokens();
         setUser(null);
         setIsLoading(false);
@@ -56,9 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await api.login(email, password);
     const employee = data.employee;
 
-    if (employee.role !== 'ADMIN' && employee.role !== 'MANAGER') {
+    if (!PORTAL_ROLES.includes(employee.role)) {
       api.clearTokens();
-      throw new Error('Access denied. Admin or Manager role required.');
+      throw new Error('Access denied. Admin, HR, or Manager role required.');
     }
 
     setUser(employee);
@@ -66,7 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    api.clearTokens();
+    // Fire-and-forget: api.logout() always resolves (it swallows its own
+    // errors) and clears local tokens itself, so the UI doesn't need to
+    // wait on the network round trip before navigating away.
+    void api.logout();
     setUser(null);
     router.push('/login');
   };

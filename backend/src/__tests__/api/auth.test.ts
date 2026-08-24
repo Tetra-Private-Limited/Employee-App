@@ -265,4 +265,116 @@ describe('Auth API', () => {
       );
     });
   });
+
+  describe('POST /auth/logout', () => {
+    it('returns 401 without auth', async () => {
+      const res = await request(app).post('/auth/logout');
+      expect(res.status).toBe(401);
+      expect(mockPrisma.employee.update).not.toHaveBeenCalled();
+    });
+
+    it('clears the refresh token hash and writes an audit log', async () => {
+      mockPrisma.employee.update.mockResolvedValue(testEmployee);
+
+      const res = await request(app)
+        .post('/auth/logout')
+        .set('Authorization', `Bearer ${makeAdminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(mockPrisma.employee.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'emp-1' },
+          data: { refreshTokenHash: null },
+        })
+      );
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: 'emp-1', action: 'LOGOUT' }),
+        })
+      );
+    });
+
+    it('a refresh token is rejected after logout', async () => {
+      // Simulate the state logout leaves behind: refreshTokenHash cleared.
+      mockPrisma.employee.update.mockResolvedValue(testEmployee);
+      await request(app).post('/auth/logout').set('Authorization', `Bearer ${makeAdminToken()}`);
+
+      mockPrisma.employee.findUnique.mockResolvedValue({ ...testEmployee, refreshTokenHash: null });
+
+      const refreshToken = jwt.sign(
+        { id: 'emp-1', email: testEmployee.email, role: testEmployee.role },
+        config.jwt.refreshSecret,
+        { expiresIn: '7d' }
+      );
+
+      const res = await request(app).post('/auth/refresh').send({ refreshToken });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /auth/register', () => {
+    const newAccount = {
+      name: 'New Hire',
+      email: 'newhire@test.com',
+      password: 'password123',
+      employeeCode: 'E100',
+    };
+
+    it('returns 401 without auth', async () => {
+      const res = await request(app).post('/auth/register').send(newAccount);
+      expect(res.status).toBe(401);
+      expect(mockPrisma.employee.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 for EMPLOYEE role', async () => {
+      const empToken = jwt.sign(
+        { id: 'u2', email: 'emp@test.com', role: 'EMPLOYEE' },
+        config.jwt.accessSecret,
+        { expiresIn: '1h' }
+      );
+
+      const res = await request(app)
+        .post('/auth/register')
+        .set('Authorization', `Bearer ${empToken}`)
+        .send(newAccount);
+
+      expect(res.status).toBe(403);
+      expect(mockPrisma.employee.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 for MANAGER role', async () => {
+      const managerToken = jwt.sign(
+        { id: 'u3', email: 'mgr@test.com', role: 'MANAGER' },
+        config.jwt.accessSecret,
+        { expiresIn: '1h' }
+      );
+
+      const res = await request(app)
+        .post('/auth/register')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send(newAccount);
+
+      expect(res.status).toBe(403);
+      expect(mockPrisma.employee.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 201 for ADMIN role', async () => {
+      mockPrisma.employee.create.mockResolvedValue({
+        id: 'new-1',
+        name: newAccount.name,
+        email: newAccount.email,
+        employeeCode: newAccount.employeeCode,
+      });
+
+      const res = await request(app)
+        .post('/auth/register')
+        .set('Authorization', `Bearer ${makeAdminToken()}`)
+        .send(newAccount);
+
+      expect(res.status).toBe(201);
+      expect(mockPrisma.employee.create).toHaveBeenCalled();
+    });
+  });
 });

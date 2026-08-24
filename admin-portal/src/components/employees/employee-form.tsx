@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { useManagerOptions } from '@/hooks/useEmployees';
 import { CreateEmployeeForm, UpdateEmployeeForm, Employee, Role } from '@/lib/types';
 
 interface EmployeeFormProps {
@@ -15,6 +16,7 @@ interface EmployeeFormProps {
 const roleOptions = [
   { value: 'EMPLOYEE', label: 'Employee' },
   { value: 'MANAGER', label: 'Manager' },
+  { value: 'HR', label: 'HR' },
   { value: 'ADMIN', label: 'Admin' },
 ];
 
@@ -22,6 +24,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
   const isEdit = !!employee;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { managers } = useManagerOptions();
 
   const [formData, setFormData] = useState({
     name: employee?.name || '',
@@ -32,7 +35,12 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
     designation: employee?.designation || '',
     employeeCode: employee?.employeeCode || '',
     role: (employee?.role || 'EMPLOYEE') as Role,
+    managerId: employee?.managerId || '',
   });
+
+  const managerOptions = managers
+    .filter((m) => m.id !== employee?.id)
+    .map((m) => ({ value: m.id, label: `${m.name} (${m.employeeCode})` }));
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -52,6 +60,9 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
         if (formData.department !== (employee!.department || '')) updateData.department = formData.department || undefined;
         if (formData.designation !== (employee!.designation || '')) updateData.designation = formData.designation || undefined;
         if (formData.role !== employee!.role) updateData.role = formData.role;
+        if (formData.managerId !== (employee!.managerId || '')) {
+          updateData.managerId = formData.managerId || null;
+        }
         await onSubmit(updateData);
       } else {
         await onSubmit({
@@ -63,6 +74,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
           designation: formData.designation || undefined,
           employeeCode: formData.employeeCode,
           role: formData.role,
+          managerId: formData.managerId || null,
         });
       }
     } catch (err) {
@@ -141,6 +153,14 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
           onChange={(e) => handleChange('designation', e.target.value)}
         />
       </div>
+
+      <Select
+        label="Manager"
+        options={managerOptions}
+        placeholder="No manager assigned"
+        value={formData.managerId}
+        onChange={(e) => handleChange('managerId', e.target.value)}
+      />
 
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
         <Button type="button" variant="outline" onClick={onCancel}>

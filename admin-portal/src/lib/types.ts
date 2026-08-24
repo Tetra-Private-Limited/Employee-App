@@ -1,5 +1,5 @@
 // Enums
-export type Role = 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
+export type Role = 'EMPLOYEE' | 'MANAGER' | 'HR' | 'ADMIN';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY';
 export type GeofenceType = 'OFFICE' | 'CLIENT' | 'WAREHOUSE' | 'CUSTOM';
 export type AlertType = 'MOCK_LOCATION' | 'IMPOSSIBLE_TRAVEL' | 'SPOOFING_APP' | 'GNSS_ANOMALY' | 'INTEGRITY_FAILURE' | 'SENSOR_MISMATCH';
@@ -16,6 +16,7 @@ export interface Employee {
   designation: string | null;
   role: Role;
   isActive: boolean;
+  managerId: string | null;
   registeredDeviceId: string | null;
   deviceModel: string | null;
   deviceBoundAt: string | null;
@@ -185,6 +186,7 @@ export interface CreateEmployeeForm {
   designation?: string;
   employeeCode: string;
   role?: Role;
+  managerId?: string | null;
 }
 
 export interface UpdateEmployeeForm {
@@ -194,6 +196,7 @@ export interface UpdateEmployeeForm {
   department?: string;
   designation?: string;
   role?: Role;
+  managerId?: string | null;
   isActive?: boolean;
 }
 

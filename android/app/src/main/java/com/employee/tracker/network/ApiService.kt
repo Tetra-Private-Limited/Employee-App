@@ -17,6 +17,9 @@ interface ApiService {
     @GET("auth/me")
     suspend fun getProfile(): Response<ApiResponse<EmployeeInfo>>
 
+    @POST("auth/logout")
+    suspend fun logout(): Response<ApiResponse<Any>>
+
     @POST("auth/change-password")
     suspend fun changePassword(@Body request: ChangePasswordRequest): Response<ApiResponse<Any>>
 
